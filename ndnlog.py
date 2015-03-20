@@ -4,6 +4,67 @@ from enum import Enum
 
 DefaultTimeFunc = lambda match: int(match.group('timestamp'))
 
+NdnRtcStatCaptions = [
+"Acquired frames", 
+"Acquired key frames",
+"Dropped frames",
+"Dropped key frames",
+"Assembled frames",
+"Assembled key frames",
+"Recovered frames",
+"Recovered key frames",
+"Rescued frames",
+"Rescued key frames",
+"Incomplete frames",
+"Incomplete key frames",
+"Jitter target size",
+"Jitter playable size",
+"Jitter estimated size",
+"Producer rate",
+"Playback #",
+"Last delta #",
+"Last key #",
+"Played frames",
+"Played key frames",
+"Skipped (no key)",
+"Skipped (incomplete)",
+"Skipped (bad GOP)",
+"Skipped (incomplete key)",
+"Latency (est.)",
+"Delta segments average",
+"Key segments average",
+"Delta parity segments average",
+"Key parity segments average",
+"Retransmission frequency",
+"Retransmissions",
+"Rebufferings",
+"Requested",
+"Requested key",
+"Default W",
+"Current W",
+"RTT'",
+"Incoming bitrate (Kbps)",
+"Incoming segments rate",
+"Segments received",
+"Timeouts",
+"RTT estimation",
+"Interest rate",
+"Interest queue",
+"Sent interests"]
+
+def getStatisticsRegexString():
+	return getStatCaptionsRegexString()+'\s*(?P<value>-?[0-9]+\.[0-9]{2})'
+
+def getStatCaptionsRegexString():
+	s = '(?P<caption>'
+	for c in NdnRtcStatCaptions:
+		if not NdnRtcStatCaptions.index(c) == 0:
+			s += '|'
+		s += re.escape(str(c))
+	s += ')'
+	return s
+
+
 def parseLog(file, actionArray):
 	"""Parses file line by line and check it using action array.
 	Action array's elements are dictionaries with these fields:
@@ -44,6 +105,21 @@ def parseLog(file, actionArray):
  	    # for line
  	    print 'parsed '+str(nLines)+' lines'
 # with
+
+def getSummaryStat(logFile):
+	regex = re.compile(getStatisticsRegexString())
+	stopLine = compileNdnLogPattern(NdnLogToken.stat.__str__(), '.*consumer', 'final statistics:')
+	summary = {}
+	nLinesParsed = 0
+	for line in reversed(open(logFile).readlines()):
+		m = regex.match(line)
+		if m:
+			summary[m.group('caption')] = m.group('value')
+		final = stopLine.match(line)
+		if final:
+			break;
+		nLinesParsed += 1
+	return summary
 
 def compileNdnLogPattern(tokenString, componentString, msgRegExpString):
 	"""" Compiles regular expression for parsing NDN-RTC log file
