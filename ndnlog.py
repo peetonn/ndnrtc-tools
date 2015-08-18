@@ -3,6 +3,7 @@ import re
 from enum import Enum
 
 DefaultTimeFunc = lambda match: int(match.group('timestamp'))
+NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
 
 def parseLog(file, actionArray):
 	"""Parses file line by line and check it using action array.
@@ -37,7 +38,7 @@ def parseLog(file, actionArray):
  	        m = pattern.match(line)
  	        if m and actionFunc:
  	          timestamp = timeFunc(m)
- 	          if not actionFunc(timestamp, m, userData):
+ 	          if not actionFunc(timestamp, m, {'userData':userData, 'lineNo':nLines}):
  	            action['func'] = None
  	            break
  	      nLines+=1
