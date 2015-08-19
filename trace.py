@@ -16,6 +16,18 @@ tracePatternString="(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<
 
 if len(sys.argv) < 2:
   print "usage: "+__file__+" <nfd1.log> [<nfd2.log> ...]"
+  print ""
+  print "\tThis script is used for tracing actual interests and data objects through several NFD instances"
+  print "\tDepending on the number of NFD log files supplied, script will print out timestamps of moments"
+  print "\twhen certain NDN-RTC interest/data object has entered NFD and left it. Thus, for each hub provided"
+  print "\tthere will be 4 columns with timestamps: interest in, interest out, data in, data out."
+  print "\tIf more than one log file is provided, script will trace same interest/data accross all log files."
+  print "\tIn general form, if N NFD log files are provided, each output row will look like this:"
+  print ""
+  print "\tSeg Key\t\t|<-HUB1->|\t|<-HUB2->| ...\t|<-HUBN->|\t|<-HUBN->| ...\t|<-HUB2->|\t|<-HUB1->|"
+  print "\t----------------------------------------------------------------------------------------------------------"
+  print "\tFrameNo-SegNo\ti_in i_out\ti_in i_out ...\ti_in i_out\td_in d_out ...\td_in d_out\td_in d_out"
+  print ""
   exit(1)
 
 def getThreadName():

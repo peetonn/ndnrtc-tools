@@ -17,6 +17,23 @@ Exit='\x03'
 
 if len(sys.argv) < 2:
   print "usage: "+__file__+" <log_file>"
+  print ""
+  print "\t"+__file__+" may be used to interactively analyze consumer log files. It parses log file"
+  print "\tand collects all available statistic information, as well as the state of the buffer."
+  print "\tScript iteratively parses log file until it meets log entry about new incoming data."
+  print "\tIt pauses there and prints out all main stat info it could gather by this moment."
+  print "\tUser is then able to proceed or step backwards on 1- and 10-iterations granularity."
+  print "\tIf log contains data about buffer state, it will be gathered and can be printed by pressing '"+PrintBuffer+"'"
+  print "\tControls:"
+  print "\t\tRight arrow - move to next iteration"
+  print "\t\tLeft arrow - move to previous iteration"
+  print "\t\tUp arrow - move +10 iterations forward"
+  print "\t\tDown arrow - move -10 iterations backward"
+  print "\t\t"+TillRebuffering+" - fastforward till rebuffering is encoutered"
+  print "\t\t"+PrintBuffer+" - print current buffer state"
+  print "\tLog file should contain statistics information (STAT level) and (optionally) buffer state "
+  print "\tinformation (level TRACE)"
+  print ""
   exit(1)
 
 class StatKeyword(Enum):

@@ -59,6 +59,10 @@ if __name__ == '__main__':
 	if len(sys.argv) < 2:
 		print 'usage: '+sys.argv[0] + ' <log_file> [-a]'
 		print '\t -a: print all buffer states (in normal mode only states with incomplete 1st frame are printed)'
+		print ""
+		print "\tThis script is useful to interactively iterate through the buffer states or to locate 'bad' buffer states - "
+		print "\tones, where first frame (the frame that should be taken out by playout mechanism) is incomplete. Log file should"
+		print "\tcontain buffer state information (TRACE level)"
 		exit(1)
 
 	logFile = sys.argv[1]

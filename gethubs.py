@@ -9,7 +9,9 @@ if '__main__' == __name__:
 	if len(sys.argv) > 1:
 		webpage = sys.argv[1]
 	else:
-		print "usage "+__name__+" <webpage>"
+		print "usage "+__name__+" <webpage_url>"
+		print "This script parses webpage at <webpage_url> and looks for the table of testbed hubs."
+		print "It is supposed to be testbed status webpage: http://arl.wustl.edu/~jdd/ndnstatus/ndn_prefix/tbs_ndnx.html"
 		eixt()
 	page=requests.get(webpage)
 	tree=html.fromstring(page.text)

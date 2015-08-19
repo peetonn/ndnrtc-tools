@@ -43,7 +43,27 @@ function error()
 
 function usage()
 {
-	echo "${0} -t <test_time> [-h <hubs_file>]"
+	echo "${0} -t <test_time_sec> [-h <hubs_file>]"
+	echo "	Test scenario - one-to-one unidirectional stream fetching accross the testbed"
+	echo "	It is assumed that there's a producer avaiable somewhere on the testbed under "
+	echo "	PRODUCER_PREFIX prefix and PRODUCER_NAME username"
+	echo "	This script executes consumer-only tests per hub provided. If hubs file is provided"
+	echo "	script will execute one test per hub. Otherwise, it will get all currently available hubs"
+	echo "	on NDN testbed and run test per each hub then. A hubs file is a tab-delimited two-column file"
+	echo "	first column contains hub name and second it's servername or IP address"
+	echo "	Each test will run for <test_time_sec> seconds per testbed hub and will include following steps:"
+	echo "		- ensure NFD and ndncon are stopped"
+	echo "		- start NFD, register prefix / to the current testbed hub"
+	echo "		- start ndnping utility"
+	echo "		- start ping utility"
+	echo "		- start ndncon with auto-fetching arguments to fetch from test producer (test producer is defined"
+	echo "			by variables PRODUCER_PREFIX and PRODUCER_NAME"
+	echo "		- every 20 seconds a screenshot of opened Safari window will be taken (it's supposed to have NDN"
+	echo "			testbed map opened in Safari)"
+	echo "		- stop ndncon after test time elapsed"
+	echo "		- stop NFD, stop ndnping and ping utilities"
+	echo "		- copy nfd.log, ndnping.log, ping.log and consumer log file to the subfolder named as currently tested"
+	echo "			hub under test run folder in 'out' directory. Test run folder is named with current date and time."
 }
 
 function getPid()
@@ -56,14 +76,6 @@ function getPid()
 function stopApp()
 {
 	killall $1 >/dev/null 2>&1
-	# local pid
-	# pid=$(getPid "${1}")
-
-	# if [ -n "${pid}" ] ; then
-	# 	echo "[***] stopping ${1} (${pid})"	
-	# 	kill -9 $pid
-	# 	echo "[***] ${1} stopped"
-	# fi
 }
 
 function getHubs()

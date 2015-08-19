@@ -6,6 +6,7 @@ from ndnlog import NdnLogToken
 
 if len(sys.argv) < 2:
   print "usage: "+__file__+" <log_file>"
+  print "This script analyzes consumer log file and searches for all rebufferings happened"
   exit(1)
 
 def onBufferAppendDetected(timestamp, match, userData):

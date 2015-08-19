@@ -1,10 +1,28 @@
+# this is a module that have basic primitive classes and functions for 
+# parsing NDN-RTC logs and NFD logs
+
 import fileinput
 import re
 from enum import Enum
 
 DefaultTimeFunc = lambda match: int(match.group('timestamp'))
+
+# NDN-RTC interest/data name. 
+# filters interests' and data names according to the current NDN-RTC namespace
+# for example:
+# /ndn/edu/ucla/remap/ndnrtc/user/clockwork_ndn/streams/camera/low/key/3991/data/%00%00/5/119730/115739/1/59709
+# 
+# these groups are available if regex match:
+# - frame_type - delta/key
+# - frame_no - frame number
+# - data_type - data/parity
+# - seg_no - segment number (use segNoToInt function to convert canonical segment number into integer)
+# - play_no - frame playback number (optional, valid for data names only, not interest names)
+# - segnum - total number of segments (optional, valid for data names only)
+# - psegnum - total number of parity segments (optional, valid for data names only)
 NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
 
+# statistics captions
 NdnRtcStatCaptions = [
 "Acquired frames", 
 "Acquired key frames",
@@ -108,6 +126,9 @@ def parseLog(file, actionArray):
 # with
 
 def getSummaryStat(logFile):
+	""" Extracts final statistics from consumer log file
+	Returns dictionary where key is a statistics caption defined in NdnRtcStatCaptions array
+	"""
 	regex = re.compile(getStatisticsRegexString())
 	stopLine = compileNdnLogPattern(NdnLogToken.stat.__str__(), '.*consumer', 'final statistics:')
 	summary = {}
@@ -133,9 +154,13 @@ def compileNdnLogPattern(tokenString, componentString, msgRegExpString):
 	return re.compile(patternString)
 
 def segNoToInt(segNo):
+  """ Converts canonical segment number (string) into an integer
+  """
   return int(segNo.split("%")[1]+segNo.split("%")[2], 16)
 
 def intToSegNo(segNo):
+	""" Converts integer segment number into a canonical segments number (string)
+	"""
 	hexs=hex(segNo).replace('0x','')
 	byte1 = ''
 	byte0 = ''
@@ -152,8 +177,10 @@ def intToSegNo(segNo):
 		byte1 = '0'+byte1
 	return '%'+byte1+'%'+byte0
 
+# segment key string - is a string in a form of "<frame_number>-<segment_number>"
+# this string uniquely identifies frame segments throughout one consumer log file
 def frameNoFromSegKey(segKey):
-	""" Extracts frame number from segment key (which is usually in a form of '<frameNo>-<segNo>'') """
+	""" Extracts frame number from segment key string (which is usually in a form of '<frameNo>-<segNo>'') """
 	divPos = segKey.find('-')
 	if divPos >= 0:
 		return int(segKey[0:divPos])
@@ -161,7 +188,7 @@ def frameNoFromSegKey(segKey):
 		raise Exception('unexpected segment key', segKey)
 
 def segmentNoFromSegKey(segKey):
-	""" Extracts segment number from segment key (which is usually in a form of '<frameNo>-<segNo>'') """
+	""" Extracts segment number from segment key string (which is usually in a form of '<frameNo>-<segNo>'') """
 	divPos = segKey.find('-')
 	if divPos >= 0:
 		return int(segKey[divPos+1:])
@@ -242,6 +269,8 @@ class Frame:
 
 #******************************************************************************
 class BufferState:
+	""" This class represents buffer state printed in consumer log file
+	"""
 	def __init__(self):
 		self.frames = []
 
