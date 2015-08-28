@@ -5,10 +5,6 @@ from enum import Enum
 from collections import OrderedDict
 import re
 
-if len(sys.argv) < 3:
-  print "usage: "+__file__+" <log_file> <timeslice_ms> [<summary_file>] [--no-headers]"
-  exit(1)
-
 class StatKeyword(Enum):
   Dgen = 1
   Darr = 2
@@ -19,12 +15,16 @@ class StatKeyword(Enum):
   rttPrime = 7
   lambdaD = 8
   lambdaC = 9
+  recovered = 10
+  rescued = 11
+  rtx = 12
 
   def __str__(self):
     return {StatKeyword.Dgen:'Dgen', StatKeyword.Darr:'Darr',\
     StatKeyword.bufTarget:'buf tar', StatKeyword.bufEstimate:'buf est', StatKeyword.bufPlayable:'buf play',\
     StatKeyword.rttEst:'rtt est', StatKeyword.rttPrime:'rtt prime',
-    StatKeyword.lambdaD:'lambda d', StatKeyword.lambdaC:'lambda'}[self]
+    StatKeyword.lambdaD:'lambda d', StatKeyword.lambdaC:'lambda',
+    StatKeyword.rtx:'rtx', StatKeyword.rescued:'resc', StatKeyword.recovered:'recover'}[self]
 
 def statEntryRegex(statEntry):
   return str(statEntry)
@@ -32,7 +32,8 @@ def statEntryRegex(statEntry):
 statRegexString = '(?P<stat_entry>'+statEntryRegex(StatKeyword.Dgen)+'|'+statEntryRegex(StatKeyword.Darr)+'|'+\
   statEntryRegex(StatKeyword.bufTarget)+'|'+statEntryRegex(StatKeyword.bufEstimate)+'|'+statEntryRegex(StatKeyword.bufPlayable)+'|'+\
   statEntryRegex(StatKeyword.rttEst)+'|'+statEntryRegex(StatKeyword.rttPrime)+'|'+\
-  statEntryRegex(StatKeyword.lambdaD)+'|'+statEntryRegex(StatKeyword.lambdaC)+')\\t(?P<value>[0-9.-]+)'
+  statEntryRegex(StatKeyword.lambdaD)+'|'+statEntryRegex(StatKeyword.lambdaC)+'|'+\
+  statEntryRegex(StatKeyword.recovered)+'|'+statEntryRegex(StatKeyword.rescued)+'|'+statEntryRegex(StatKeyword.rtx)+')\\t(?P<value>[0-9.-]+)'
 statRegex = re.compile(statRegexString)
 
 def closeStatBlock(timestamp):
@@ -147,6 +148,9 @@ def onStatEntry(timestamp, match, userData):
   return True
 
 if __name__ == '__main__':
+  if len(sys.argv) < 3:
+    print "usage: "+__file__+" <log_file> <timeslice_ms> [<summary_file>] [--no-headers]"
+    exit(1)
   logFile = sys.argv[1]
   timeSlice = int(sys.argv[2])
   summaryFile = None
@@ -165,7 +169,8 @@ if __name__ == '__main__':
   runClosed = False
   statBlockNum = 0
   runBlock = OrderedDict([(str(StatKeyword.Dgen),[]), (str(StatKeyword.Darr),[]), (str(StatKeyword.bufTarget),[]), (str(StatKeyword.bufEstimate),[]),\
-  (str(StatKeyword.bufPlayable),[]), (str(StatKeyword.rttEst),[]), (str(StatKeyword.rttPrime),[]), (str(StatKeyword.lambdaD),[]), (str(StatKeyword.lambdaC),[])])
+  (str(StatKeyword.bufPlayable),[]), (str(StatKeyword.rttEst),[]), (str(StatKeyword.rttPrime),[]), (str(StatKeyword.lambdaD),[]), (str(StatKeyword.lambdaC),[]),\
+  (str(StatKeyword.rtx), []), (str(StatKeyword.recovered), []), (str(StatKeyword.rescued), [])])
   statBlock = runBlock.copy()
 
   chaseTrackRegexString = 'phase Chasing finished in (?P<chase_time>[0-9]+) msec'
