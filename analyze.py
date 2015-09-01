@@ -22,8 +22,8 @@ class StatKeyword(Enum):
   def __str__(self):
     return {StatKeyword.Dgen:'Dgen', StatKeyword.Darr:'Darr',\
     StatKeyword.bufTarget:'buf tar', StatKeyword.bufEstimate:'buf est', StatKeyword.bufPlayable:'buf play',\
-    StatKeyword.rttEst:'rtt est', StatKeyword.rttPrime:'rtt prime',
-    StatKeyword.lambdaD:'lambda d', StatKeyword.lambdaC:'lambda',
+    StatKeyword.rttEst:'rtt est', StatKeyword.rttPrime:'rtt prime',\
+    StatKeyword.lambdaD:'lambda d', StatKeyword.lambdaC:'lambda',\
     StatKeyword.rtx:'rtx', StatKeyword.rescued:'resc', StatKeyword.recovered:'recover'}[self]
 
 def statEntryRegex(statEntry):
