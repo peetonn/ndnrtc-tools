@@ -24,6 +24,7 @@ ndnping = "ndnping.log"
 ping = "ping.log"
 summary = "summary.txt"
 verbose = False
+printRebufferingsOnly = False
 
 def log(msg):
 	global verbose
@@ -88,51 +89,62 @@ def getSummary(file):
 	return summary
 
 def run(folder):
-	global ping, ndnping, summary
-	testrunFolders = os.listdir(folder)
+	global ping, ndnping, summary, printRebufferingsOnly
+	r = re.compile('consumer-(?P<consumer_name>.*)\.txt')
+	testrunFolders = sorted(os.listdir(folder))
 	for testrunFolder in testrunFolders:
 		if not os.path.isdir(os.path.join(folder, testrunFolder)):
 			continue
-		consumerFolders = os.listdir(os.path.join(folder, testrunFolder))
+		consumerFolders = sorted(os.listdir(os.path.join(folder, testrunFolder)))
 		if len(consumerFolders):
 			print testrunFolder
 			for consumerFolder in consumerFolders:
 				if not os.path.isdir(os.path.join(folder, testrunFolder, consumerFolder)):
 					continue
-				ndnpingFile = os.path.join(folder, testrunFolder, consumerFolder, ndnping)
-				if not os.path.isfile(ndnpingFile):
-					error("couldn't find file "+ndnpingFile)
-					continue
-				pingFile = os.path.join(folder, testrunFolder, consumerFolder, ping)
-				if not os.path.isfile(pingFile):
-					error("couldn't find file "+pingFile)
-					continue
-				summaryFile = os.path.join(folder, testrunFolder, consumerFolder, summary)
-				if not os.path.isfile(summaryFile):
-					error("couldn't find file "+summaryFile)
-					continue
-				log("extracting data for "+consumerFolder)
-				pingRtt, pingVar = getPing(pingFile)
-				ndnRtt, ndnRttVar = getNdnPing(ndnpingFile)
-				summ = getSummary(summaryFile)
-				print consumerFolder
-				i = 0
-				for run in summ:
-					i += 1
-					print "{0:.2f}\t{1:0.2f}\t{2:0.2f}\t{3:0.2f}\t{4:0.2f}\t{5:0.2f}\t{6:0.2f}\t{7:0.2f}\t{8:0.2f}\t{9:0.2f}\t{10:0.2f}\t{11:0.2f}\t{12:0.2f}\t{13:0.2f}".format(run['run_time'], run[StatKeyword.rttPrime], \
-						run[StatKeyword.rttEst], ndnRtt, ndnRttVar, pingRtt, pingVar,\
-						run[StatKeyword.Dgen], run[StatKeyword.Darr], run[StatKeyword.lambdaD], run[StatKeyword.lambdaC],
-						run[StatKeyword.bufEstimate], run[StatKeyword.bufPlayable], run[StatKeyword.bufTarget])
+				hubFolders = sorted(os.listdir(os.path.join(folder, testrunFolder, consumerFolder)))
+				if len(hubFolders) > 0:
+					for hubFolder in hubFolders:
+						ndnpingFile = os.path.join(folder, testrunFolder, consumerFolder, hubFolder, ndnping)
+						if not os.path.isfile(ndnpingFile):
+							error("couldn't find file "+ndnpingFile)
+							continue
+						pingFile = os.path.join(folder, testrunFolder, consumerFolder, hubFolder, ping)
+						if not os.path.isfile(pingFile):
+							error("couldn't find file "+pingFile)
+							continue
+						hubFolderPath = os.path.join(folder, testrunFolder, consumerFolder, hubFolder)
+						pingRtt, pingVar = getPing(pingFile)
+						ndnRtt, ndnRttVar = getNdnPing(ndnpingFile)
+						summaryFiles = glob.glob(os.path.join(folder, testrunFolder, consumerFolder, hubFolder)+"/summary-*.txt")
+						#print summaryFiles
+						if len(summaryFiles) > 0:
+							for summaryFile in summaryFiles:
+								log("extracting data for "+summaryFile)								
+								summ = getSummary(summaryFile)
+								i = 0
+								m = r.search(summaryFile)
+								consumerName = m.group('consumer_name') if m else summaryFile
+								if printRebufferingsOnly == True:
+									sys.stdout.write(consumerName + "\t"+str(len(summ))+"\n")
+								else:
+									print consumerName
+									for run in summ:
+										i += 1								
+										if run['run_time'] > 0:
+											print "{0:.2f}\t{1:0.2f}\t{2:0.2f}\t{3:0.2f}\t{4:0.2f}\t{5:0.2f}\t{6:0.2f}\t{7:0.2f}\t{8:0.2f}\t{9:0.2f}\t{10:0.2f}\t{11:0.2f}\t{12:0.2f}\t{13:0.2f}".format(run['run_time'], run[StatKeyword.rttPrime], \
+												run[StatKeyword.rttEst], ndnRtt, ndnRttVar, pingRtt, pingVar,\
+												run[StatKeyword.Dgen], run[StatKeyword.Darr], run[StatKeyword.lambdaD], run[StatKeyword.lambdaC],
+												run[StatKeyword.bufEstimate], run[StatKeyword.bufPlayable], run[StatKeyword.bufTarget])
 
 #******************************************************************************
 def usage():
-	print "usage: "+sys.argv[0]+" -f<tests_folder>"
+	print "usage: "+sys.argv[0]+" -f<tests_folder> [-r]"
 	sys.exit(0)
 
 def main():
-	global verbose
+	global verbose, printRebufferingsOnly
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "vf:", ["-v", "test-folder="])
+		opts, args = getopt.getopt(sys.argv[1:], "vrf:", ["-v", "-r", "test-folder="])
 	except getopt.GetoptError as err:
 		print str(err)
 		usage()
@@ -142,6 +154,8 @@ def main():
 			testFolder = a
 		elif o in ("-v"):
 			verbose = True
+		elif o in ("-r"):
+			printRebufferingsOnly = True
 		else:
 			assert False, "unhandled option "+o
 	if not 'testFolder' in locals():
