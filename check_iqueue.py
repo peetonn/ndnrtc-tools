@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import ndnlog
 import getopt
 import sys
@@ -29,12 +31,13 @@ def usage():
 
 interests = OrderedDict()
 count=0
+threshold=100
 # key - "frameNo-segNo"
 # value - {'enq':enqueueTimestamp, 'exp':expressTimestamp}
 
 def onInterestsExpressed(timestamp, match, userInfo):
 	global interests
-	global count
+	global count, threshold
 	keyNo = match.group('frame_no')
 	segNo = ndnlog.segNoToInt(match.group('seg_no'))
 	t = 'd' if match.group('data_type') == 'data' else 'p' 
@@ -46,9 +49,9 @@ def onInterestsExpressed(timestamp, match, userInfo):
 	diff=interests[segKey]['exp']-interests[segKey]['enq']
 	
 	
-	if diff>=100:
+	if diff>=threshold:
 		count=count+1
-		print segKey, interests[segKey], 'Difference:', diff,'!!!!diff>=100!!!'
+		print segKey, interests[segKey], 'Difference:', diff,'!!!!diff>='+str(threshold)
 	else:
 		print segKey, interests[segKey], 'Difference:', diff
 	return True
@@ -92,11 +95,11 @@ def run(logFile):
 
 def main():
 	global verbose
-	global count
+	global count, threshold
 
 	logFile = None
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "f:", ["log-file="])
+		opts, args = getopt.getopt(sys.argv[1:], "f:t:", ["log-file=", "threshold="])
 	except getopt.GetoptError as err:
 		print str(err)
 		usage()
@@ -105,14 +108,17 @@ def main():
 		if o in ("-f", "--log-file"):
 			logFile = a
 			print "log file is "+logFile
+		elif o in ("-t", "--threshold"):
+			threshold = float(a)
 		elif o in ("-v"):
 			verbose = True
 		else:
 			assert False, "unhandled option "+o
 	if not logFile:
 		usage();
+		exit(1)
 	run(logFile)
-	print 'count >=100',count
+	print 'count >='+str(threshold),count
 	
 
 if __name__ == '__main__':
