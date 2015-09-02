@@ -22,5 +22,6 @@ for line in sys.stdin:
 			if diffMs > threshold:
 				diffSec = diffMs/1000
 				sys.stdout.write("\t^ {0}sec {1}ms\n".format(diffSec, diffMs))
+	else:
+		sys.stdout.write(line)
 	prevLine = line
-	sys.stdout.write(line)
