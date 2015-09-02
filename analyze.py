@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import ndnlog
 import sys
 from ndnlog import NdnLogToken

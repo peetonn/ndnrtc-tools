@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # this script takes tests folder as an argument
 # it assumes that each testrun subfolder contains
 # log files from the test run in subfolders per consumer 

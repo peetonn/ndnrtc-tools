@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # this script takes tests folder as an argument
 # it assumes that each subfolder has hub name and contains
 # log files from the test run
