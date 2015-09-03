@@ -17,6 +17,9 @@ echo "retrieveing producer publishing (sent-or-cached.log)..."
 cat $producerLog | grep "sent\|added" | time-diff.py > "${outFolder}/sent-or-cached.log"
 
 echo "retrieveing producer incoming interests (interest-and-sent.log)..."
-cat $producerLog | grep "sent\|incoming" | time-diff.py > "${outFolder}/interest-and-sent.log"
+cat $producerLog | grep "sent\|incoming interest" | time-diff.py > "${outFolder}/interest-and-sent.log"
+
+echo "retrieving consumer interruptions >100ms (consumer-interrupt.log)..."
+cat $consumerLog | time-diff.py -t 100 > "${outFolder}/consumer-interrupt.log"
 
 echo "done."
