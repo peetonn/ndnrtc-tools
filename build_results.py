@@ -127,7 +127,10 @@ def run(folder):
 								m = r.search(summaryFile)
 								consumerName = m.group('consumer_name') if m else summaryFile
 								if printRebufferingsOnly == True:
-									sys.stdout.write(consumerName + "\t"+str(len(summ))+"\n")
+									wrongRuns = 0
+									for run in summ:
+										if run['run_time'] < 0: wrongRuns += 1
+									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\n")
 								else:
 									print consumerName
 									for run in summ:
