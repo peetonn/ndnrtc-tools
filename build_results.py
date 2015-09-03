@@ -70,7 +70,7 @@ def getNdnPing(file):
 		return [numpy.mean(rtts), numpy.var(rtts)]
 	return [0,0]
 
-summaryRegex = re.compile('run\s(?P<run>[0-9]+)\sts\s(?P<timestamp>[0-9]+)\schase time\s(?P<chase_time>[0-9]+)\srun time\s(?P<run_time>[0-9]+)\sDgen\s(?P<Dgen>[0-9.]+)\sDarr\s(?P<Darr>[0-9.]+)\sbuf tar\s(?P<buf_tar>[0-9.]+)\sbuf est\s(?P<buf_est>[0-9.]+)\sbuf play\s(?P<buf_play>[0-9.]+)\srtt est\s(?P<rtt_est>[0-9.]+)\srtt prime\s(?P<rtt_prime>[0-9.]+)\slambda d\s(?P<lambda_d>[0-9.]+)\slambda\s(?P<lambda>[0-9.]+)')
+summaryRegex = re.compile('run\s(?P<run>[0-9-]+)\sts\s(?P<timestamp>[0-9]+)\schase time\s(?P<chase_time>[0-9]+)\srun time\s(?P<run_time>[0-9.-]+)\sDgen\s(?P<Dgen>[0-9.-]+)\sDarr\s(?P<Darr>[0-9.-]+)\sbuf tar\s(?P<buf_tar>[0-9.-]+)\sbuf est\s(?P<buf_est>[0-9.-]+)\sbuf play\s(?P<buf_play>[0-9.-]+)\srtt est\s(?P<rtt_est>[0-9.-]+)\srtt prime\s(?P<rtt_prime>[0-9.-]+)\slambda d\s(?P<lambda_d>[0-9.-]+)\slambda\s(?P<lambda>[0-9.-]+)')
 def getSummary(file):
 	summary = []
 	for line in open(file):

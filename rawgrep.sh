@@ -22,4 +22,7 @@ cat $producerLog | grep "sent\|incoming interest" | time-diff.py > "${outFolder}
 echo "retrieving consumer interruptions >100ms (consumer-interrupt.log)..."
 cat $consumerLog | time-diff.py -t 100 > "${outFolder}/consumer-interrupt.log"
 
+echo "retrieveing buffer states (buffer.log)..."
+tracebuf.py -f $consumerLog -a -n > "${outFolder}/buffer.log"
+
 echo "done."

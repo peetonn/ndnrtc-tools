@@ -4,12 +4,21 @@ import ndnlog
 import sys
 import re
 from ndnlog import NdnLogToken
+import getopt
 
 bufferStates = []
 currentBufferState = None
 framePopped = False
 printAll = False
+waitForUserInput = True
 poppedFrame = None
+logFile = None
+lastLambda = 0
+
+def onLambdaDetected(timestamp, match, userData):
+	global lastLambda
+	lastLambda = match.group('lambda_d')
+	return True
 
 def onBufferDumplineDetected(timestamp, match, userData):
 	global framePopped
@@ -23,20 +32,25 @@ def onBufferDumplineDetected(timestamp, match, userData):
 	return True
 
 def printCurrentBufferState():
+	global waitForUserInput, lastLambda
 	if printAll:
+		print "lambda_d "+lastLambda
 		print currentBufferState
 	else:
 		if len(currentBufferState.frames):
 			if currentBufferState.frames[0].assembledLevel < 100:
+				print "lambda_d "+lastLambda
 				print currentBufferState
 			else:
 				return
 		else:
+			print "lambda_d "+lastLambda
 			print currentBufferState
-	try:
-		input("Press enter to continue")
-	except SyntaxError:
-		pass
+	if waitForUserInput:
+		try:
+			input("Press enter to continue")
+		except SyntaxError:
+			pass
 
 def onFrameMoved(timestamp, match, userData):
 	global framePopped
@@ -55,19 +69,39 @@ def onFrameMoved(timestamp, match, userData):
 		framePopped = False
 	return True
 
+def usage():
+	print 'usage: '+sys.argv[0] + ' -f <log_file> [-a] [-n]'
+	print '\t -a: print all buffer states (in normal mode only states with incomplete 1st frame are printed)'
+	print '\t -n: do not stop for user input'
+	print ""
+	print "\tThis script is useful to interactively iterate through the buffer states or to locate 'bad' buffer states - "
+	print "\tones, where first frame (the frame that should be taken out by playout mechanism) is incomplete. Log file should"
+	print "\tcontain buffer state information (TRACE level)"
+
 if __name__ == '__main__':
-	if len(sys.argv) < 2:
-		print 'usage: '+sys.argv[0] + ' <log_file> [-a]'
-		print '\t -a: print all buffer states (in normal mode only states with incomplete 1st frame are printed)'
-		print ""
-		print "\tThis script is useful to interactively iterate through the buffer states or to locate 'bad' buffer states - "
-		print "\tones, where first frame (the frame that should be taken out by playout mechanism) is incomplete. Log file should"
-		print "\tcontain buffer state information (TRACE level)"
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], "f:an", ["-file", "-all", "-nostop"])
+	except getopt.GetoptError as err:
+		print str(err)
+		usage()
+		sys.exit(2)
+	for o, a in opts:
+		if o in ("-f", "--file"):
+			logFile = a
+		elif o in ("-a", "--all"):
+			printAll = True
+		elif o in ("-n", "--nostop"):
+			waitForUserInput = False
+		else:
+			assert False, "unhandled option "+o
+	if not logFile:
+		usage()
 		exit(1)
 
-	logFile = sys.argv[1]
-	if len(sys.argv) == 3 and sys.argv[2] == '-a':
-		printAll = True
+	trackLambda = {}
+	trackLambda['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.stat.__str__(), '.*', "lambda d\s(?P<lambda_d>[0-9.-]+)")
+	trackLambda['tfunc'] = ndnlog.DefaultTimeFunc
+	trackLambda['func'] = onLambdaDetected
 
 	parseBuffer = {}
 	parseBuffer['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.trace.__str__(), '.*', ndnlog.Frame.BufferFrameStringPattern)
@@ -79,4 +113,4 @@ if __name__ == '__main__':
 	moveFrame['tfunc'] = ndnlog.DefaultTimeFunc
 	moveFrame['func'] = onFrameMoved
 
-	ndnlog.parseLog(logFile, [moveFrame, parseBuffer])
+	ndnlog.parseLog(logFile, [moveFrame, trackLambda, parseBuffer])
