@@ -34,7 +34,7 @@ def onBufferDumplineDetected(timestamp, match, userData):
 def printCurrentBufferState():
 	global waitForUserInput, lastLambda
 	if printAll:
-		print "lambda_d "+lastLambda
+		print "lambda_d "+str(lastLambda)
 		print currentBufferState
 	else:
 		if len(currentBufferState.frames):
