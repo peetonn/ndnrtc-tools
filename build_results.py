@@ -78,6 +78,7 @@ def getSummary(file):
 		if m:
 			run = {}
 			run['run_time'] = float(m.group('run_time'))
+			run['chase_time'] = float(m.group('chase_time'))
 			run[StatKeyword.Dgen] = float(m.group('Dgen'))
 			run[StatKeyword.Darr] = float(m.group('Darr'))
 			run[StatKeyword.bufTarget] = float(m.group('buf_tar'))
@@ -128,9 +129,14 @@ def run(folder):
 								consumerName = m.group('consumer_name') if m else summaryFile
 								if printRebufferingsOnly == True:
 									wrongRuns = 0
+									avgChaseTime  = 0
 									for run in summ:
-										if run['run_time'] < 0: wrongRuns += 1
-									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\n")
+										if run['run_time'] < 0: 
+											wrongRuns += 1
+										else:
+											avgChaseTime += run['chase_time']
+									avgChaseTime = avgChaseTime/(len(summ)-wrongRuns)
+									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\n")
 								else:
 									print consumerName
 									for run in summ:
