@@ -131,7 +131,7 @@ def run(folder):
 									wrongRuns = 0
 									avgChaseTime  = 0
 									for run in summ:
-										if run['run_time'] < 0: 
+										if run['run_time'] <= 0: 
 											wrongRuns += 1
 										else:
 											avgChaseTime += run['chase_time']
