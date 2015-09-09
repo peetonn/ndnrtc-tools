@@ -193,7 +193,7 @@ if __name__ == '__main__':
   dataReceivedActions['tfunc'] = ndnlog.DefaultTimeFunc
   dataReceivedActions['func'] = onData
 
-  rebufferingRegexString = 'rebuffering #(?P<rebuf_no>[0-9]+) seed (?P<seed>[0-9]+) key (?P<key>[0-9]+) delta (?P<delta>[0-9]+) curent w (?P<cur_w>[0-9]+) default w (?P<default_w>[0-9]+)'
+  rebufferingRegexString = 'rebuffering #(?P<rebuf_no>[0-9]+) seed (?P<seed>[0-9]+) key (?P<key>[0-9]+) delta (?P<delta>[0-9]+) curent w (?P<cur_w>[0-9-]+) default w (?P<default_w>[0-9-]+)'
   rebufferingActions = {}
   rebufferingActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.warning.__str__(), '.consumer-pipeliner', rebufferingRegexString)
   rebufferingActions['tfunc'] = timeFunc
