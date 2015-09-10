@@ -16,7 +16,8 @@ PING_CMD="ping"
 SCREENCAP_INTERVAL=20
 SCREENCAP="screencapture -l$(osascript -e 'tell app "Safari" to id of window 1')"
 
-HOSTS_SCRIPT="gethubs.py"
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HOSTS_SCRIPT="${DIR}/gethubs.py"
 HOSTS_WEBPAGE="http://www.arl.wustl.edu/~jdd/ndnstatus/ndn_prefix/tbs_ndnx.html"
 GET_HOSTS_CMD="$HOSTS_SCRIPT $HOSTS_WEBPAGE"
 
@@ -157,8 +158,8 @@ function nfdRegisterPrefix()
 	local prefix=$1
 	local ip=$2
 
-	log "registering prefix / for $ip..."
-	eval "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
+	log "registering prefix $prefix for $ip..."
+	eval "${NDN_DAEMON_REG_PREFIX} $prefix udp://$ip"
 }
 
 function setupNfd()
@@ -171,6 +172,7 @@ function setupNfd()
 	
 	if [ $? -eq 0 ]; then
 		sleep 5
+		nfdRegisterPrefix "/" $address
 		nfdRegisterPrefix $PRODUCER_PREFIX $address
 	fi
 }
@@ -259,6 +261,9 @@ getHubs $hubsFile
 PRODUCER_PREFIX=$(getHubPrefix $hubsFile $PRODUCER_HUB)
 CONSUMER_PREFIX=$(getHubPrefix $hubsFile $CONSUMER_HUB)
 
+echo "producer hub ${PRODUCER_HUB} prefix ${PRODUCER_PREFIX}"
+echo "consumer hub ${CONSUMER_HUB} prefix ${CONSUMER_PREFIX}"
+
 # start test run
 TESTS_FOLDER="${OUT_FOLDER}/$(date +%Y-%m-%d_%H-%M)"
 NDNCON_APP_ARGS="-auto-publish-prefix ${PRODUCER_PREFIX} -auto-publish-user ${PRODUCER_NAME} -auto-fetch-prefix ${CONSUMER_PREFIX} -auto-fetch-user ${CONSUMER_NAME} $TEST"
@@ -319,7 +324,7 @@ if [ $? -ne 0 ]; then
  runTime=0
  while [ $runTime -le $testTime ] ; do
  	sleep $SCREENCAP_INTERVAL
- 	#takeScreenshot $hub $address
+ 	takeScreenshot $hub $address
  	let runTime+=$SCREENCAP_INTERVAL
  	let SCREENSHOT_IDX+=1
  done
