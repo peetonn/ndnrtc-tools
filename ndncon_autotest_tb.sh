@@ -130,16 +130,15 @@ function runCp()
 	tests_folder=$5
 	producer=$6
 	consumer=$7
-	scpdest=$8
-	producerHub=$9
-	consumerHub=$10
+	producerHub=$8
+	consumerHub=$9
 
 	eruntestLog=${tests_folder}/eruntest-${producer}.out
 	clientDstLogDir="$test_folder/$producer"
 	mkdir -p $clientDstLogDir
 
 	log "starting consumer-producer ${cpIp} (${cpUser}-$producer, fetching from $consumer, test type ${test_type})"
-	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest-tb.sh -o /ndnproject/out -t ${test_time} -p ${producer} -c ${consumer} -${test_type} -k ${producerHub} -l${consumerHub}\" &> ${eruntestLog}"
+	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest-tb.sh -o /ndnproject/out -t ${test_time} -p ${producer} -c ${consumer} -${test_type} -k ${producerHub} -l ${consumerHub}\" &> ${eruntestLog}"
 	runCmd "${RUNTEST_CMD}"
 	log "logs are in ${eruntestLog}"
 
@@ -172,6 +171,7 @@ function runtest()
 
 	local client1Hub=$1
 	local client2Hub=$2
+
 	test_name=$3
 	test_time=$4
 	test_type=$5
@@ -218,7 +218,7 @@ function runtests()
 	i=1
 	while read client1Hub client2Hub type; do 
 		log "running test $i ($client1Hub <-> $client2Hub)"
-		testName="${i}-${client1Hub}-${client2Hub}"
+		testName="${i}-${type}-${client1Hub}-${client2Hub}"
 		runtest $client1Hub $client2Hub $testName $testTime $type $TESTS_FOLDER
 		
 		k=0
