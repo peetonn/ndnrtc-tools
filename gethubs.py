@@ -35,7 +35,7 @@ if '__main__' == __name__:
 		m = re.match(r"http://(?P<name>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})|(([0-9A-z-]+)\.?)+)(:80)?",urls[i])
 		if m :
 			nodeUrl = m.group('name')
-			nodePrefix = prefixes[i]
+			nodePrefix = prefixes[i].split('ndn:')[1]
 			nodePrefixes[nodeUrl] = nodePrefix
 		i += 1
 

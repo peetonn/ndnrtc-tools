@@ -1,9 +1,6 @@
 #!/bin/sh
 export PATH="/usr/local/bin":$PATH
 
-PRODUCER_PREFIX="/a/b/c"
-CONSUMER_PREFIX="/a/b/c"
-
 NDNCON_APP_DIR="/ndnproject/ndncon.app"
 NDNCON_APP="${NDNCON_APP_DIR}/Contents/MacOS/ndncon"
 
@@ -21,7 +18,7 @@ SCREENCAP="screencapture -l$(osascript -e 'tell app "Safari" to id of window 1')
 
 HOSTS_SCRIPT="gethubs.py"
 HOSTS_WEBPAGE="http://www.arl.wustl.edu/~jdd/ndnstatus/ndn_prefix/tbs_ndnx.html"
-GET_HOSTS_CMD="python $HOSTS_SCRIPT $HOSTS_WEBPAGE"
+GET_HOSTS_CMD="$HOSTS_SCRIPT $HOSTS_WEBPAGE"
 
 HUBS=()
 HUB_NAMES=()
@@ -128,6 +125,22 @@ function getHubPrefix()
 		let i=$i+1
 	done
 	echo $prefix
+}
+
+function getHubAddress()
+{
+	local hubsFile=$1
+	local hubName=$2
+	local address
+	i=0
+	for name in ${HUB_NAMES[@]} ; do
+		if [ "$name" == "$hubName" ] ; then
+			address=${HUBS[$i]}
+			break
+		fi
+		let i=$i+1
+	done
+	echo $address
 }
 
 function setupEnv()
@@ -262,62 +275,61 @@ sleep 2
 
 idx=0
 
-for hub in ${HUB_NAMES[@]} ; do
-	address=${HUBS[$idx]}
-	log "running test $idx for hub $hub (address $address)"
-	
-	setupEnv $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up environment for $hub. skipping to the next hub..."
-        continue
-    fi
+hub=$PRODUCER_HUB
+address=$(getHubAddress $hubsFile $hub)
+log "running test $idx for hub $hub (address $address)"
 
-	setupNfd $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up NFD for $hub. skipping to the next hub..."
-        continue
-    fi
 
-	#sleep to start hub nfdc script manually
-	log "sleep 5 sec to start hub nfdc script manually"
-	sleep 5
+setupEnv $hub $address
+if [ $? -ne 0 ]; then
+     error "error setting up environment for $hub. skipping to the next hub..."
+     continue
+ fi
 
-    setupNdnping $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up ndnping for $hub. skipping to the next hub..."
-        continue
-    fi
+setupNfd $hub $address
+if [ $? -ne 0 ]; then
+     error "error setting up NFD for $hub. skipping to the next hub..."
+     continue
+ fi
 
-    setupPing $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up ping for $hub. skipping to the next hub..."
-        continue
-    fi
+#sleep to start hub nfdc script manually
+log "sleep 5 sec to start hub nfdc script manually"
+sleep 5
 
-    setupNdncon $hub $address
-    if [ $? -ne 0 ]; then
-        error "error setting up ndncon for $hub. skipping to the next hub..."
-        continue
-    fi
+ setupNdnping $hub $address
+if [ $? -ne 0 ]; then
+     error "error setting up ndnping for $hub."
+     exit 1
+ fi
 
-    log "running test $idx..."
-    SCREENSHOT_IDX=0
-    runTime=0
-    while [ $runTime -le $testTime ] ; do
-    	sleep $SCREENCAP_INTERVAL
-    	#takeScreenshot $hub $address
-    	let runTime+=$SCREENCAP_INTERVAL
-    	let SCREENSHOT_IDX+=1
-    done
+ setupPing $hub $address
+if [ $? -ne 0 ]; then
+     error "error setting up ping for $hub."
+     exit 1
+ fi
 
-    copyNdnconLog $hub $address
-    cleanupNdncon $hub $address
-    cleanupPing $hub $address
-    cleanupNdnping $hub $address
-    cleanupNfd $hub $address
-	let idx+=1
+ setupNdncon $hub $address
+ if [ $? -ne 0 ]; then
+     error "error setting up ndncon for $hub."
+     exit 1
+ fi
 
-	log "test $idx completed"
-	sleep 5
-done
+ log "running test $idx..."
+ SCREENSHOT_IDX=0
+ runTime=0
+ while [ $runTime -le $testTime ] ; do
+ 	sleep $SCREENCAP_INTERVAL
+ 	#takeScreenshot $hub $address
+ 	let runTime+=$SCREENCAP_INTERVAL
+ 	let SCREENSHOT_IDX+=1
+ done
 
+ copyNdnconLog $hub $address
+ cleanupNdncon $hub $address
+ cleanupPing $hub $address
+ cleanupNdnping $hub $address
+ cleanupNfd $hub $address
+let idx+=1
+
+log "test $idx completed"
+sleep 5
