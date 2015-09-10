@@ -17,6 +17,8 @@ NDN_DAEMON_STOP=nfd-stop
 NDN_DAEMON_LOG="nfd.log"
 NDN_DAEMON_REG_PREFIX="nfdc register"
 
+RUN_ANALYSIS_CMD="analyze.sh"
+
 function log()
 {
 	#if [ $DEBUG -eq "1" ] ; then
@@ -225,6 +227,9 @@ function runtests()
 		sleep 2
 		let i=$i+1
 	done <$setupFile
+
+	log "invoking analysis on all test results..."
+	runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
 }
 
 
