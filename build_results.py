@@ -130,13 +130,16 @@ def run(folder):
 								if printRebufferingsOnly == True:
 									wrongRuns = 0
 									avgChaseTime  = 0
+									avgrttEstTime  = 0
 									for run in summ:
 										if run['run_time'] <= 0: 
 											wrongRuns += 1
 										else:
 											avgChaseTime += run['chase_time']
+											avgrttEstTime += run[StatKeyword.rttEst]
 									avgChaseTime = avgChaseTime/(len(summ)-wrongRuns)
-									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\n")
+									avgrttEstTime = avgrttEstTime/(len(summ)-wrongRuns)
+									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\t"+str(avgrttEstTime)+"\n")
 								else:
 									print consumerName
 									for run in summ:
