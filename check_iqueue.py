@@ -61,6 +61,7 @@ def onInterestsEnqueue(timestamp, match, userInfo):
 
 	keyNo = match.group('frame_no')
 	segNo = ndnlog.segNoToInt(match.group('seg_no'))
+	print str(timestamp)+" segNo "+match.group('seg_no')
 	t = 'd' if match.group('data_type') == 'data' else 'p' 
 	segKey = str(keyNo)+ '-' + str(segNo)+t
 	if not segKey in interests.keys():

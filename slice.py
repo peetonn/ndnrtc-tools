@@ -14,6 +14,7 @@ import getopt
 
 verbose = False
 output = None
+runLog = None
 
 def log(msg):
   global verbose
@@ -33,10 +34,13 @@ def fatal(msg):
 
 #******************************************************************************
 def setupRunFile(runNo):
-  global output
+  global output, runLog
   if output:
     output.close()
+  if runLog:
+    runLog.close()
   output = open("run"+str(runNo)+".stat", 'w')
+  runLog = open("run"+str(runNo)+".log", 'w')
 
 def printKeywordHeader(kw):
   global output
@@ -44,10 +48,13 @@ def printKeywordHeader(kw):
     output.write(str(key)+'\t')
   output.write('\n')
 
-def printKeywordDataBlock(kw):
+def printKeywordDataBlock(timestamp, kw):
   global output
+  output.write(str(timestamp)+'\t')
   for key in kw.keys():
-    output.write(str(kw[key])+'\t')
+    output.write(str(kw[key]))
+    if kw.keys().index(key) != len(kw)-1:
+      output.write('\t')
   output.write('\n')
 
 def onRebuffering(timestamp, match, userData):
@@ -64,7 +71,7 @@ def onRebuffering(timestamp, match, userData):
 def onKeywordFound(timestamp, match, userData):
   kwBlock = userData['userData']
   kwBlock[match.group('keyword')] = match.group('value')
-  printKeywordDataBlock(kwBlock)
+  printKeywordDataBlock(timestamp, kwBlock)
   return True
 
 def onKeywordEntry(timestamp, match, userData):
@@ -76,6 +83,11 @@ def onKeywordEntry(timestamp, match, userData):
       print str(statEntry) + ' is not in stat block: '+str(statBlock)
     else:
       statBlock[statEntry].append(value)
+  return True
+
+def sliceLogIntoRuns(timestamp, match, userData):
+  global runLog
+  runLog.write(match.string)
   return True
 
 def run(logFile, keywords, sliceruns):
@@ -103,10 +115,15 @@ def run(logFile, keywords, sliceruns):
   rebufferingActions['func'] = onRebuffering
   rebufferingActions['userdata'] = {'run':0, 'kw':keywordDataBlock}
 
+  sliceActions = {}
+  sliceActions['pattern'] = ndnlog.compileNdnLogPattern('.*', '.*', '.*')
+  sliceActions['tfunc'] = ndnlog.DefaultTimeFunc
+  sliceActions['func'] = sliceLogIntoRuns
+
   setupRunFile(0)
 
   printKeywordHeader(keywordDataBlock)
-  ndnlog.parseLog(logFile, [rebufferingActions, keywordParsingActions])
+  ndnlog.parseLog(logFile, [sliceActions, rebufferingActions, keywordParsingActions])
   output.close()
 
 #******************************************************************************

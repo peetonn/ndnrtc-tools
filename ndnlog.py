@@ -156,7 +156,11 @@ def compileNdnLogPattern(tokenString, componentString, msgRegExpString):
 def segNoToInt(segNo):
   """ Converts canonical segment number (string) into an integer
   """
-  return int(segNo.split("%")[1]+segNo.split("%")[2], 16)
+  try:
+  	return int(segNo.split("%")[1]+segNo.split("%")[2], 16)
+  except:
+  	print "problem segno"+str(segNo)
+  	return 0
 
 def intToSegNo(segNo):
 	""" Converts integer segment number into a canonical segments number (string)
@@ -262,7 +266,7 @@ class Frame:
     return f
   
   def __str__(self):
-      return "["+str(self.frameType)+", "+str(self.seqNo)+", "+str(self.playNo)+", "+str(self.timestamp)+", "+str(self.assembledLevel)+"% ("+str(self.parityLevel)+"%), "+str(self.pairedNo)+", "+str(self.consistency)+', '+str(self.deadline)+', '+str(self.rtxCount)+"]"
+      return "["+str(self.frameType)+", "+str(self.seqNo)+", "+str(self.playNo)+", "+str(self.timestamp)+", "+str(self.assembledLevel)+"% ("+str(self.parityLevel)+"%), "+str(self.pairedNo)+", "+str(self.consistency)+', '+str(self.deadline)+', '+str(self.rtxCount)+', '+str(self.cacheStatus)+"]"
   
   def __repr__(self):
       return self.__str__()

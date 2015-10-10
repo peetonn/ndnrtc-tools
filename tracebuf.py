@@ -57,16 +57,19 @@ def onFrameMoved(timestamp, match, userData):
 	global currentBufferState
 	global printAll
 	frame = ndnlog.Frame(match)
-	if match.group('move') == 'pop':
-		if currentBufferState:
-				bufferStates.append(currentBufferState)
-				printCurrentBufferState()
-		poppedFrame = ndnlog.Frame(match)
-		currentBufferState = ndnlog.BufferState()
-		currentBufferState.addFrame(timestamp, poppedFrame)
-		framePopped = True
-	else:
-		framePopped = False
+	# if match.group('move') == 'pop':
+	if currentBufferState:
+		bufferStates.append(currentBufferState)
+		printCurrentBufferState()
+	poppedFrame = ndnlog.Frame(match)
+	currentBufferState = ndnlog.BufferState()
+	currentBufferState.addFrame(timestamp, poppedFrame)
+	# if match.group('move') == 'pop':
+		# framePopped = True
+	# else:
+	framePopped = True
+	# else:
+	# 	framePopped = False
 	return True
 
 def usage():
