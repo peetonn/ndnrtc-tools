@@ -138,11 +138,13 @@ def run(folder):
 								m = r.search(summaryFile)
 								consumerName = m.group('consumer_name') if m else summaryFile
 								if printRebufferingsOnly == True:
+									runTimeSum = 0
 									wrongRuns = 0
 									avgChaseTime = 0
 									avgrttEstTime = 0
 									recoverSum = 0
 									rescSum = 0
+									rtxSum = 0
 									skipNoKeySum = 0
 									skippedIncompleteDelSum = 0
 									skippedIncompleteKeySum = 0
@@ -152,10 +154,12 @@ def run(folder):
 										if run['run_time'] <= 0: 
 											wrongRuns += 1
 										else:
+											runTimeSum +=run['run_time']/1000 # convert from milliseconds to seconds
 											avgChaseTime += run['chase_time']
 											avgrttEstTime += run[StatKeyword.rttEst]
 											recoverSum += run[StatKeyword.recovered]
 											rescSum += run[StatKeyword.rescued]
+											rtxSum += run[StatKeyword.rtx]
 											skipNoKeySum += run[StatKeyword.skipNoKey]
 											skippedIncompleteDelSum += run[StatKeyword.skippedIncompleteDel]
 											skippedIncompleteKeySum += run[StatKeyword.skippedIncompleteKey]
@@ -170,7 +174,7 @@ def run(folder):
 										avgrttEstTime = -1
 									if totalAcquiredFramesSum==0:
 										totalAcquiredFramesSum=-1
-									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\t"+str(avgrttEstTime)+"\t"+str(recoverSum)+"\t"+str(rescSum)+"\t"+str(skipNoKeySum)+"\t"+str(skippedIncompleteDelSum)+"\t"+str(skippedIncompleteKeySum)+"\t"+str(skippedBadGopSum)+"\t"+str(totalAcquiredFramesSum)+"\n")
+									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(runTimeSum)+"\t"+str(avgChaseTime)+"\t"+str(avgrttEstTime)+"\t"+str(recoverSum)+"\t"+str(rescSum)+"\t"+str(rtxSum)+"\t"+str(skipNoKeySum)+"\t"+str(skippedIncompleteDelSum)+"\t"+str(skippedIncompleteKeySum)+"\t"+str(skippedBadGopSum)+"\t"+str(totalAcquiredFramesSum)+"\n")
 									#sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\t"+str(avgrttEstTime)+"\t"+str(recoverSum/totalAcquiredFramesSum*100)+"\t"+str(rescSum/totalAcquiredFramesSum*100)+"\t"+str(skipNoKeySum)+"\t"+str(skippedIncompleteDelSum)+"\t"+str(skippedIncompleteKeySum)+"\t"+str(skippedBadGopSum)+"\n")
 								else:
 									print consumerName
