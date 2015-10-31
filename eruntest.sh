@@ -16,7 +16,7 @@ NDN_DAEMON_REG_PREFIX="nfdc register"
 NDNPING_CMD="ndnping"
 PING_CMD="ping"
 
-SCREENCAP_INTERVAL=20
+SCREENCAP_INTERVAL=10
 SCREENCAP="screencapture -l$(osascript -e 'tell app "Safari" to id of window 1')"
 
 HOSTS_SCRIPT="gethubs.py"
@@ -257,8 +257,8 @@ for hub in ${HUB_NAMES[@]} ; do
     fi
 
 	#sleep to start hub nfdc script manually
-	log "sleep 5 sec to start hub nfdc script manually"
-	sleep 5
+	log "sleep 15 sec to start hub nfdc script manually"
+	sleep 15
 
     setupNdnping $hub $address
 	if [ $? -ne 0 ]; then
@@ -284,6 +284,12 @@ for hub in ${HUB_NAMES[@]} ; do
     while [ $runTime -le $testTime ] ; do
     	sleep $SCREENCAP_INTERVAL
     	#takeScreenshot $hub $address
+    	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	timestamp_unix=$(date +%s)
+    	nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	ndncon_usage=$(ps -h -p `pgrep ndncon | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss|  awk 'NR>1')
+    	echo "timestamp: $timestamp, nfd-usage: $nfd_usage" >> $TESTS_FOLDER/$hub/resourceNFDUsage-${PRODUCER_NAME}.log
+    	echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, ndncon-usage: $ndncon_usage" >> $TESTS_FOLDER/$hub/resourceNdnconUsage-${PRODUCER_NAME}.log
     	let runTime+=$SCREENCAP_INTERVAL
     	let SCREENSHOT_IDX+=1
     done

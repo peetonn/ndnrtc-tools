@@ -1,11 +1,13 @@
 #!/bin/bash
 DEBUG=0
 
-PREFIX="/a/b/c"
-TEST_IFACE="eth1"
+PREFIX="/a"
+TEST_IFACE1="eth1"
+TEST_IFACE0="eth0"
 CPIP1="131.179.142.33"
 CPUSER1="remap"
-CPIP2="131.179.142.30"
+# CPIP2="131.179.142.30"
+CPIP2="192.168.1.66"
 CPUSER2="remap"
 
 NDNCON_USER1="test2"
@@ -65,9 +67,16 @@ function nfdRegisterPrefix()
 {
 	local prefix=$1
 	local ip=$2
-
-	log "registering prefix / for $ip..."
-	runCmd "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
+	# eth1
+	local nfdstatus1=`nfd-status| grep "eth1"`
+	local faceid1=`perl getfaceid.sh $nfdstatus1`
+	log "registering prefix / for faceid: $faceid1..."
+	runCmd "${NDN_DAEMON_REG_PREFIX} / $faceid1"
+	# eth0
+	local nfdstatus0=`nfd-status| grep "eth0"`
+	local faceid0=`perl getfaceid.sh $nfdstatus0`
+	log "registering prefix / for faceid: $faceid0..."
+	runCmd "${NDN_DAEMON_REG_PREFIX} / $faceid0"
 }
 
 function setupNfd()
@@ -95,14 +104,18 @@ function shapeNetwork()
 	bw=$3
 
 	log "shaping network: latency ${lat}ms, packet loss ${loss}%, bandwidth ${bw}Kbit/s"
-	SHAPE_NW_CMD="sudo tc qdisc add dev ${TEST_IFACE} root netem delay ${lat} loss ${loss}"
-	runCmd "${SHAPE_NW_CMD}"
+	SHAPE_NW_CMD1="sudo tc qdisc add dev ${TEST_IFACE1} root netem delay ${lat} loss ${loss}"
+	runCmd "${SHAPE_NW_CMD1}"
+	SHAPE_NW_CMD0="sudo tc qdisc add dev ${TEST_IFACE0} root netem delay ${lat} loss ${loss}"
+	runCmd "${SHAPE_NW_CMD0}"
 }
 
 function unshapeNetwork()
 {
-	UNSHAPE_NW_CMD="sudo tc qdisc del dev ${TEST_IFACE} root netem"
-	runCmd "${UNSHAPE_NW_CMD}"
+	UNSHAPE_NW_CMD1="sudo tc qdisc del dev ${TEST_IFACE1} root netem"
+	runCmd "${UNSHAPE_NW_CMD1}"
+	UNSHAPE_NW_CMD0="sudo tc qdisc del dev ${TEST_IFACE0} root netem"
+	runCmd "${UNSHAPE_NW_CMD0}"
 }
 
 ################################################################################
@@ -134,7 +147,7 @@ function runCp()
 	mkdir -p $clientDstLogDir
 
 	log "starting consumer-producer ${cpIp} (${cpUser}-$producer, fetching from $consumer, test type ${test_type})"
-	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest.sh -o /ndnproject/out -t ${test_time} -h /ndnproject/ndnrtc-tools/hubfile -p ${producer} -c ${consumer} -${test_type}\" &> ${eruntestLog}"
+	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest-eth.sh -o /ndnproject/out -t ${test_time} -h /ndnproject/ndnrtc-tools/hubfile -p ${producer} -c ${consumer} -${test_type}\" &> ${eruntestLog}"
 	runCmd "${RUNTEST_CMD}"
 	log "logs are in ${eruntestLog}"
 
@@ -150,7 +163,7 @@ function runHub()
 	runCmd "ndnpingserver $PREFIX & > /dev/null"
 	log "ndnpingserver started"
 	nfdRegisterPrefix "/" $CPIP1
-	nfdRegisterPrefix "/" $CPIP2
+	# nfdRegisterPrefix "/" $CPIP2
 }
 
 function cleanupHub()

@@ -1,7 +1,7 @@
 #!/bin/bash
 DEBUG=0
 
-#PREFIX="/ndn/edu/ucla"
+
 TEST_IFACE="eth0"
 CPIP1="192.168.1.111"
 CPUSER1="remap"
@@ -11,16 +11,9 @@ CPUSER2="remap"
 NDNCON_USER1="test3"
 NDNCON_USER2="test4"
 
-NDN_DAEMON=nfd
-NDN_DAEMON_START=nfd-start
-NDN_DAEMON_STOP=nfd-stop
-NDN_DAEMON_LOG="nfd.log"
-NDN_DAEMON_REG_PREFIX="nfdc register"
-
-# RUN_ANALYSIS_CMD="analyze.sh"
-# RUN_BUILD_RESULTS="build_results.py"
-# RUN_BUILD_SHORT_RESULTS="build_results.py -r"
-RUN_COPY_CMD="ndncon_autotest_tb_copy_log.sh"
+RUN_ANALYSIS_CMD="analyze.sh"
+#RUN_BUILD_RESULTS="build_results.py"
+#RUN_BUILD_SHORT_RESULTS="build_results.py -r"
 
 function log()
 {
@@ -52,61 +45,11 @@ function usage()
 	echo "	test_time - time of one test in seconds"
 	echo "	tests_setup_file - textual tab-delimited file with four columns: "
 	echo "	latency, loss, bandwidth and test type. Test type can be either"
-	echo "	'a' (audio) 'v' (video) or 'av' (audio+video). Script will run "
+	echo "	'a' (audio) 'v' (video) or 'z' (audio+video). Script will run "
 	echo "	one test per line by shaping network according to the parameters"
 	echo "	specified."
 }
 
-function stopApp()
-{
-	runCmd "killall $1 >/dev/null 2>&1"
-}
-
-function nfdRegisterPrefix()
-{
-	local prefix=$1
-	local ip=$2
-
-	log "registering prefix / for $ip..."
-	runCmd "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
-}
-
-function setupNfd()
-{
-	local test_folder
-	test_folder=$1
-
-	log "setting up NFD..."
-	runCmd "$NDN_DAEMON_START &> \"${test_folder}/nfd.log\""
-}
-
-function cleanupNfd()
-{
-	runCmd "${NDN_DAEMON_STOP}"
-}
-
-################################################################################
-function shapeNetwork()
-{
-	local lat
-	local loss
-	local bw
-	lat=$1
-	loss=$2
-	bw=$3
-
-	log "shaping network: latency ${lat}ms, packet loss ${loss}%, bandwidth ${bw}Kbit/s"
-	SHAPE_NW_CMD="sudo tc qdisc add dev ${TEST_IFACE} root netem delay ${lat} loss ${loss}"
-	runCmd "${SHAPE_NW_CMD}"
-}
-
-function unshapeNetwork()
-{
-	UNSHAPE_NW_CMD="sudo tc qdisc del dev ${TEST_IFACE} root netem"
-	runCmd "${UNSHAPE_NW_CMD}"
-}
-
-################################################################################
 CLIENT_ERUNLOG_ARR=()
 CLIENT_DSTLOGDIR_ARR=()
 CLIENT_SCP_ARR=()
@@ -136,32 +79,10 @@ function runCp()
 
 	eruntestLog=${tests_folder}/eruntest-${producer}.out
 	clientDstLogDir="$test_folder/$producer"
-	mkdir -p $clientDstLogDir
-
-	log "starting consumer-producer ${cpIp} (${cpUser}-$producer, fetching from $consumer, test type ${test_type})"
-	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest-tb.sh -o /ndnproject/out -t ${test_time} -p ${producer} -c ${consumer} -${test_type} -k ${producerHub} -l ${consumerHub}\" &> ${eruntestLog}"
-	runCmd "${RUNTEST_CMD}"
-	log "logs are in ${eruntestLog}"
-
+	
 	CLIENT_ERUNLOG_ARR+=("$eruntestLog")
 	CLIENT_SCP_ARR+=("${cpUser}@${cpIp}")
 	CLIENT_DSTLOGDIR_ARR+=("$clientDstLogDir")
-}
-
-function runHub()
-{
-	local test_folder
-	test_folder=$1
-	runCmd "ndnpingserver $PREFIX & > /dev/null"
-	log "ndnpingserver started"
-	nfdRegisterPrefix "/" $CPIP1
-	nfdRegisterPrefix "/" $CPIP2
-}
-
-function cleanupHub()
-{
-	cleanupNfd
-	stopApp ndnpingserver
 }
 
 function runtest()
@@ -177,21 +98,17 @@ function runtest()
 	test_time=$4
 	test_type=$5
 	tests_folder=$6
-
-	CLIENT_ERUNLOG_ARR=()
-	CLIENT_DSTLOGDIR_ARR=()
-	CLIENT_SCP_ARR=()
 	
 	test_folder="$tests_folder/$test_name"
-	mkdir -p $test_folder
+	
 
 	runCp $CPIP2 $CPUSER2 $test_time $test_type $test_folder $NDNCON_USER2 $NDNCON_USER1 $client2Hub $client1Hub
 	runCp $CPIP1 $CPUSER1 $test_time $test_type $test_folder $NDNCON_USER1 $NDNCON_USER2 $client1Hub $client2Hub
-	sleep 10
+	#sleep 10
 
 	log "running test (logs in ${test_folder})..."
-	sleep $test_time
-	sleep 15
+	#sleep $test_time
+	#sleep 15
 	log "test completed."
 }
 
@@ -204,7 +121,7 @@ function copyClientLogs()
 	srcDir=$2
 	dstDir=$3
 	
-	log "copying log files from ${scpCred}:${srcDir}/* to ${dstDir}"
+	log "copying log files from ${scpCred}:${srcDir}/ to ${dstDir}"
 	runCmd "scp -r ${scpCred}:${srcDir}/* ${dstDir}"
 	log "done"
 }
@@ -215,32 +132,43 @@ function runtests()
 	local testTime
 	setupFile=$1
 	testTime=$2
+	TESTS_FOLDER=$3
 
-	TESTS_FOLDER="out/$(date +%Y-%m-%d_%H-%M)"
+	#TESTS_FOLDER="out/$(date +%Y-%m-%d_%H-%M)"
+	#TESTS_FOLDER="out/2015-10-05_19-50"
 	log "test results will be placed in $TESTS_FOLDER"
-	mkdir -p "$TESTS_FOLDER"
+	
 
 	i=1
-	while read client1Hub client2Hub type; do 
+	while read client1Hub client2Hub testtype; do 
 		log "running test $i ($client1Hub <-> $client2Hub)"
-		testName="${i}-${type}-${client1Hub}-${client2Hub}"
-		runtest $client1Hub $client2Hub $testName $testTime $type $TESTS_FOLDER
+		testName="${i}-${testtype}-${client1Hub}-${client2Hub}"
+		runtest $client1Hub $client2Hub $testName $testTime $testtype $TESTS_FOLDER
 		
 		k=0
 		for erunLog in "${CLIENT_ERUNLOG_ARR[@]}" ; do
 			clientRemoteLogDir="/"$(cat $erunLog  | grep -e "test files will be placed in \([-/A-z0-9_]*\)" | sed 's/.* \///')
+			sleep 0.1
 			copyClientLogs "${CLIENT_SCP_ARR[$k]}" "${clientRemoteLogDir}" "${CLIENT_DSTLOGDIR_ARR[$k]}"
 			let k=$k+1			
 		done
-		sleep 2
+		for erunLogDel in "${CLIENT_ERUNLOG_ARR[@]}" ; do
+			CLIENT_ERUNLOG_ARR=(${CLIENT_ERUNLOG_ARR[@]/$CLIENT_ERUNLOG_ARR})
+		done
+		for CLIENT_SCP_ARRDel in "${CLIENT_SCP_ARR[@]}" ; do
+			CLIENT_SCP_ARR=(${CLIENT_SCP_ARR[@]/$CLIENT_SCP_ARRDel})
+		done
+		for CLIENT_DSTLOGDIR_ARRDel in "${CLIENT_DSTLOGDIR_ARR[@]}" ; do
+			CLIENT_DSTLOGDIR_ARR=(${CLIENT_DSTLOGDIR_ARR[@]/$CLIENT_DSTLOGDIR_ARRDel})
+		done
+		#sleep 1
 		let i=$i+1
 	done <$setupFile
 
-	#log "invoking analysis on all test results..."
-	runCmd "${RUN_COPY_CMD} -s ${setupFile} -t 1 -f ${TESTS_FOLDER}"
+	log "invoking analysis on all test results..."
+	runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
 	#runCmd "${RUN_BUILD_RESULTS} -f ${TESTS_FOLDER}"
 	#runCmd "${RUN_BUILD_SHORT_RESULTS} -f ${TESTS_FOLDER}"
-
 }
 
 
@@ -248,11 +176,13 @@ function runtests()
 setupFile="n/a"
 testTime=0
 
-while getopts ":s:t:" opt; do
+while getopts ":s:t:f:" opt; do
   case $opt in
     s) setupFile="$OPTARG"
     ;;
     t) testTime="$OPTARG"
+    ;;
+    f) testsfoler="$OPTARG"
     ;;
     \?) log "Invalid option -$OPTARG" >&2
     ;;
@@ -264,4 +194,4 @@ then
 	usage
 fi
 
-runtests $setupFile $testTime
+runtests $setupFile $testTime $testsfoler

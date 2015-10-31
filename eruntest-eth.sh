@@ -1,6 +1,9 @@
 #!/bin/sh
 export PATH="/usr/local/bin":$PATH
 
+PRODUCER_PREFIX="/a"
+CONSUMER_PREFIX="/a"
+
 NDNCON_APP_DIR="/ndnproject/ndncon.app"
 NDNCON_APP="${NDNCON_APP_DIR}/Contents/MacOS/ndncon"
 
@@ -16,21 +19,19 @@ PING_CMD="ping"
 SCREENCAP_INTERVAL=10
 SCREENCAP="screencapture -l$(osascript -e 'tell app "Safari" to id of window 1')"
 
-DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-HOSTS_SCRIPT="${DIR}/gethubs.py"
+HOSTS_SCRIPT="gethubs.py"
 HOSTS_WEBPAGE="http://www.arl.wustl.edu/~jdd/ndnstatus/ndn_prefix/tbs_ndnx.html"
-GET_HOSTS_CMD="$HOSTS_SCRIPT $HOSTS_WEBPAGE"
+GET_HOSTS_CMD="python $HOSTS_SCRIPT $HOSTS_WEBPAGE"
 
 HUBS=()
 HUB_NAMES=()
-HUB_PREFIXES=()
 
 DEBUG=1
 hubsFile="N/A"
 testTime=""
 
 
-while getopts ":h:t:vazp:c:o:k:l:" opt; do
+while getopts ":h:t:vazp:c:o:" opt; do
   case $opt in
     h) hubsFile="$OPTARG"
     ;;
@@ -46,10 +47,6 @@ while getopts ":h:t:vazp:c:o:k:l:" opt; do
     ;;
     c) CONSUMER_NAME="$OPTARG"
     ;;
-    k) PRODUCER_HUB="$OPTARG"
-    ;;
-    l) CONSUMER_HUB="$OPTARG"
-    ;;
     o) OUT_FOLDER="$OPTARG"
     ;;
     \?) log "Invalid option -$OPTARG" >&2
@@ -57,7 +54,9 @@ while getopts ":h:t:vazp:c:o:k:l:" opt; do
   esac
 done
 
-##############
+TESTS_FOLDER="${OUT_FOLDER}/$(date +%Y-%m-%d_%H-%M)"
+NDNCON_APP_ARGS="-auto-publish-prefix ${PRODUCER_PREFIX} -auto-publish-user ${PRODUCER_NAME} -auto-fetch-prefix ${CONSUMER_PREFIX} -auto-fetch-user ${CONSUMER_NAME} $TEST"
+
 function log()
 {
 	if [ $DEBUG -eq "1" ] ; then
@@ -109,39 +108,7 @@ function stopApp()
 
 function getHubs()
 {
-	while read line; do pair=($line); HUB_NAMES+=(${pair[0]}); HUBS+=(${pair[1]}); HUB_PREFIXES+=(${pair[2]}); done < "${1}"
-}
-
-function getHubPrefix()
-{
-	local hubsFile=$1
-	local hubName=$2
-	local prefix
-	i=0
-	for name in ${HUB_NAMES[@]} ; do
-		if [ "$name" == "$hubName" ] ; then
-			prefix=${HUB_PREFIXES[$i]}
-			break
-		fi
-		let i=$i+1
-	done
-	echo $prefix
-}
-
-function getHubAddress()
-{
-	local hubsFile=$1
-	local hubName=$2
-	local address
-	i=0
-	for name in ${HUB_NAMES[@]} ; do
-		if [ "$name" == "$hubName" ] ; then
-			address=${HUBS[$i]}
-			break
-		fi
-		let i=$i+1
-	done
-	echo $address
+	while read line; do pair=($line); HUB_NAMES+=(${pair[0]}); HUBS+=(${pair[1]}); done < "${1}"
 }
 
 function setupEnv()
@@ -158,8 +125,11 @@ function nfdRegisterPrefix()
 	local prefix=$1
 	local ip=$2
 
-	log "registering prefix $prefix for $ip..."
-	eval "${NDN_DAEMON_REG_PREFIX} $prefix udp://$ip"
+	local nfdstatus=`nfd-status| grep "en0"`
+	local faceid=`perl /ndnproject/ndnrtc-tools/getfaceid.sh $nfdstatus`
+	log "registering prefix / for faceid: $faceid..."
+
+	eval "${NDN_DAEMON_REG_PREFIX} / $faceid"
 }
 
 function setupNfd()
@@ -170,11 +140,10 @@ function setupNfd()
 	log "setting up NFD for $hub..."
 	eval $NDN_DAEMON_START &> "$TESTS_FOLDER/$hub/nfd.log"
 	
-	#if [ $? -eq 0 ]; then
+	if [ $? -eq 0 ]; then
 		sleep 5
-		nfdRegisterPrefix "/" $address
 		nfdRegisterPrefix $PRODUCER_PREFIX $address
-	#fi
+	fi
 }
 
 function setupNdnping()
@@ -239,7 +208,10 @@ function cleanupNfd()
 {
 	eval "${NDN_DAEMON_STOP}"
 }
-#######
+
+
+
+
 
 if [ "${testTime}" = "" ]
 then 
@@ -250,24 +222,15 @@ fi
 if [ "${hubsFile}" = "N/A" ]
 then
 	log "retrieveing actual list of hubs..."
-	hubsFile=$(mktemp -t ndnhubs)
-	eval $GET_HOSTS_CMD > $hubsFile
+	tmpfile=$(mktemp -t ndnhubs)
+	eval $GET_HOSTS_CMD > $tmpfile
+	getHubs $tmpfile
 else
 	log "reading hubs from a file..."
+	getHubs $hubsFile
 fi
 
-getHubs $hubsFile
-
-PRODUCER_PREFIX=$(getHubPrefix $hubsFile $PRODUCER_HUB)
-CONSUMER_PREFIX=$(getHubPrefix $hubsFile $CONSUMER_HUB)
-
-echo "producer hub ${PRODUCER_HUB} prefix ${PRODUCER_PREFIX}"
-echo "consumer hub ${CONSUMER_HUB} prefix ${CONSUMER_PREFIX}"
-
 # start test run
-TESTS_FOLDER="${OUT_FOLDER}/$(date +%Y-%m-%d_%H-%M)"
-NDNCON_APP_ARGS="-auto-publish-prefix ${PRODUCER_PREFIX} -auto-publish-user ${PRODUCER_NAME} -auto-fetch-prefix ${CONSUMER_PREFIX} -auto-fetch-user ${CONSUMER_NAME} $TEST"
-
 log "test files will be placed in $TESTS_FOLDER"
 mkdir -p "$TESTS_FOLDER"
 
@@ -280,67 +243,68 @@ sleep 2
 
 idx=0
 
-hub=$PRODUCER_HUB
-address=$(getHubAddress $hubsFile $hub)
-log "running test $idx for hub $hub (address $address)"
+for hub in ${HUB_NAMES[@]} ; do
+	address=${HUBS[$idx]}
+	log "running test $idx for hub $hub (address $address)"
+	
+	setupEnv $hub $address
+	if [ $? -ne 0 ]; then
+        error "error setting up environment for $hub. skipping to the next hub..."
+        continue
+    fi
 
+	setupNfd $hub $address
+	if [ $? -ne 0 ]; then
+        error "error setting up NFD for $hub. skipping to the next hub..."
+        continue
+    fi
 
-setupEnv $hub $address
-if [ $? -ne 0 ]; then
-     error "error setting up environment for $hub. skipping to the next hub..."
-     continue
- fi
+	#sleep to start hub nfdc script manually
+	log "sleep 15 sec to start hub nfdc script manually"
+	sleep 15
 
-setupNfd $hub $address
-if [ $? -ne 0 ]; then
-     error "error setting up NFD for $hub. skipping to the next hub..."
-     continue
- fi
+    setupNdnping $hub $address
+	if [ $? -ne 0 ]; then
+        error "error setting up ndnping for $hub. skipping to the next hub..."
+        continue
+    fi
 
-#sleep to start hub nfdc script manually
-log "sleep 5 sec to start hub nfdc script manually"
-sleep 5
+    setupPing $hub $address
+	if [ $? -ne 0 ]; then
+        error "error setting up ping for $hub. skipping to the next hub..."
+        continue
+    fi
 
- setupNdnping $hub $address
-if [ $? -ne 0 ]; then
-     error "error setting up ndnping for $hub."
-     exit 1
- fi
+    setupNdncon $hub $address
+    if [ $? -ne 0 ]; then
+        error "error setting up ndncon for $hub. skipping to the next hub..."
+        continue
+    fi
 
- setupPing $hub $address
-if [ $? -ne 0 ]; then
-     error "error setting up ping for $hub."
-     exit 1
- fi
+    log "running test $idx..."
+    SCREENSHOT_IDX=0
+    runTime=0
+    while [ $runTime -le $testTime ] ; do
+    	sleep $SCREENCAP_INTERVAL
+    	#takeScreenshot $hub $address
+    	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	timestamp_unix=$(date +%s)
+    	nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	ndncon_usage=$(ps -h -p `pgrep ndncon | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss|  awk 'NR>1')
+    	echo "timestamp: $timestamp, nfd-usage: $nfd_usage" >> $TESTS_FOLDER/$hub/resourceNFDUsage-${PRODUCER_NAME}.log
+    	echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, ndncon-usage: $ndncon_usage" >> $TESTS_FOLDER/$hub/resourceNdnconUsage-${PRODUCER_NAME}.log
+    	let runTime+=$SCREENCAP_INTERVAL
+    	let SCREENSHOT_IDX+=1
+    done
 
- setupNdncon $hub $address
- if [ $? -ne 0 ]; then
-     error "error setting up ndncon for $hub."
-     exit 1
- fi
+    copyNdnconLog $hub $address
+    cleanupNdncon $hub $address
+    cleanupPing $hub $address
+    cleanupNdnping $hub $address
+    cleanupNfd $hub $address
+	let idx+=1
 
- log "running test $idx..."
- SCREENSHOT_IDX=0
- runTime=0
- while [ $runTime -le $testTime ] ; do
- 	sleep $SCREENCAP_INTERVAL
- 	takeScreenshot $hub $address
- 	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
-    timestamp_unix=$(date +%s)
-    nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
-    ndncon_usage=$(ps -h -p `pgrep ndncon | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss|  awk 'NR>1')
-    echo "timestamp: $timestamp, nfd-usage: $nfd_usage" >> $TESTS_FOLDER/$hub/resourceNFDUsage-${PRODUCER_NAME}.log
-    echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, ndncon-usage: $ndncon_usage" >> $TESTS_FOLDER/$hub/resourceNdnconUsage-${PRODUCER_NAME}.log
- 	let runTime+=$SCREENCAP_INTERVAL
- 	let SCREENSHOT_IDX+=1
- done
+	log "test $idx completed"
+	sleep 5
+done
 
- copyNdnconLog $hub $address
- cleanupNdncon $hub $address
- cleanupPing $hub $address
- cleanupNdnping $hub $address
- cleanupNfd $hub $address
-let idx+=1
-
-log "test $idx completed"
-sleep 5

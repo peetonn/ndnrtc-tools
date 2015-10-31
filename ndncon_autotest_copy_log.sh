@@ -5,21 +5,19 @@ PREFIX="/a/b/c"
 TEST_IFACE="eth1"
 CPIP1="131.179.142.33"
 CPUSER1="remap"
-CPIP2="131.179.142.30"
+CPIP2="192.168.1.66"
 CPUSER2="remap"
 
 NDNCON_USER1="test2"
 NDNCON_USER2="test1"
 
-NDN_DAEMON=nfd
-NDN_DAEMON_START=nfd-start
-NDN_DAEMON_STOP=nfd-stop
-NDN_DAEMON_LOG="nfd.log"
-NDN_DAEMON_REG_PREFIX="nfdc register"
+#NDN_DAEMON=nfd
+#NDN_DAEMON_START=nfd-start
+#NDN_DAEMON_STOP=nfd-stop
+#NDN_DAEMON_LOG="nfd.log"
+#NDN_DAEMON_REG_PREFIX="nfdc register"
 
-#RUN_ANALYSIS_CMD="analyze.sh"
-RUN_COPY_CMD="ndncon_autotest_copy_log.sh"
-CAPUSAGE_INTERVAL=10
+RUN_ANALYSIS_CMD="analyze.sh"
 
 function log()
 {
@@ -67,7 +65,7 @@ function nfdRegisterPrefix()
 	local ip=$2
 
 	log "registering prefix / for $ip..."
-	runCmd "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
+	#runCmd "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
 }
 
 function setupNfd()
@@ -76,7 +74,7 @@ function setupNfd()
 	test_folder=$1
 
 	log "setting up NFD..."
-	runCmd "$NDN_DAEMON_START &> \"${test_folder}/nfd.log\""
+	#runCmd "$NDN_DAEMON_START &> \"${test_folder}/nfd.log\""
 }
 
 function cleanupNfd()
@@ -95,14 +93,14 @@ function shapeNetwork()
 	bw=$3
 
 	log "shaping network: latency ${lat}ms, packet loss ${loss}%, bandwidth ${bw}Kbit/s"
-	SHAPE_NW_CMD="sudo tc qdisc add dev ${TEST_IFACE} root netem delay ${lat} loss ${loss}"
-	runCmd "${SHAPE_NW_CMD}"
+	#SHAPE_NW_CMD="sudo tc qdisc add dev ${TEST_IFACE} root netem delay ${lat} loss ${loss}"
+	#runCmd "${SHAPE_NW_CMD}"
 }
 
 function unshapeNetwork()
 {
 	UNSHAPE_NW_CMD="sudo tc qdisc del dev ${TEST_IFACE} root netem"
-	runCmd "${UNSHAPE_NW_CMD}"
+	#runCmd "${UNSHAPE_NW_CMD}"
 }
 
 ################################################################################
@@ -131,11 +129,11 @@ function runCp()
         scpdest=$8
 	eruntestLog=${tests_folder}/eruntest-${producer}.out
 	clientDstLogDir="$test_folder/$producer"
-	mkdir -p $clientDstLogDir
+	#mkdir -p $clientDstLogDir
 
 	log "starting consumer-producer ${cpIp} (${cpUser}-$producer, fetching from $consumer, test type ${test_type})"
-	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest.sh -o /ndnproject/out -t ${test_time} -h /ndnproject/ndnrtc-tools/hubfile -p ${producer} -c ${consumer} -${test_type}\" &> ${eruntestLog}"
-	runCmd "${RUNTEST_CMD}"
+	#RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest.sh -o /ndnproject/out -t ${test_time} -h /ndnproject/ndnrtc-tools/hubfile -p ${producer} -c ${consumer} -${test_type}\" &> ${eruntestLog}"
+	#runCmd "${RUNTEST_CMD}"
 	log "logs are in ${eruntestLog}"
 
 	CLIENT_ERUNLOG_ARR+=("$eruntestLog")
@@ -147,16 +145,16 @@ function runHub()
 {
 	local test_folder
 	test_folder=$1
-	runCmd "ndnpingserver $PREFIX & > /dev/null"
+	#runCmd "ndnpingserver $PREFIX & > /dev/null"
 	log "ndnpingserver started"
-	nfdRegisterPrefix "/" $CPIP1
-	nfdRegisterPrefix "/" $CPIP2
+	#nfdRegisterPrefix "/" $CPIP1
+	#nfdRegisterPrefix "/" $CPIP2
 }
 
 function cleanupHub()
 {
 	cleanupNfd
-	stopApp ndnpingserver
+	#stopApp ndnpingserver
 }
 
 function runtest()
@@ -174,30 +172,19 @@ function runtest()
 	CLIENT_SCP_ARR=()
 	
 	test_folder="$tests_folder/$test_name"
-	mkdir -p $test_folder
+	#mkdir -p $test_folder
 
-	setupNfd $test_folder
+	#setupNfd $test_folder
 	runCp $CPIP2 $CPUSER2 $test_time $test_type $test_folder $NDNCON_USER2 $NDNCON_USER1
 	runCp $CPIP1 $CPUSER1 $test_time $test_type $test_folder $NDNCON_USER1 $NDNCON_USER2
-	sleep 5
-	runHub $test_folder
+	#sleep 5
+	#runHub $test_folder
 
 	log "running test (logs in ${test_folder})..."
-	runTime=0
-    while [ $runTime -le $test_time ] ; do
-    	sleep $CAPUSAGE_INTERVAL
-    	#takeScreenshot $hub $address
-    	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
-    	timestamp_unix=$(date +%s)
-    	nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
-    	echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, nfd-usage: $nfd_usage" >> $test_folder/resourceNFDUsage-hub.log
-
-    	let runTime+=$CAPUSAGE_INTERVAL
-    done
-	# sleep $test_time
-	sleep 15
-	cleanupHub
-	sleep 5
+	sleep $test_time
+	#sleep 15
+	#cleanupHub
+	#sleep 5
 	log "test completed."
 }
 
@@ -210,9 +197,10 @@ function copyClientLogs()
 	srcDir=$2
 	dstDir=$3
 	
-	sleep 5
+	#sleep 5
 	log "copying log files from ${scpCred}:${srcDir}/* to ${dstDir}"
 	runCmd "scp -r ${scpCred}:${srcDir}/* ${dstDir}"
+	#sleep 5
 	log "done"
 }
 
@@ -222,32 +210,34 @@ function runtests()
 	local testTime
 	setupFile=$1
 	testTime=$2
+	TESTS_FOLDER=$3
 
-	TESTS_FOLDER="out/$(date +%Y-%m-%d_%H-%M)"
+	#TESTS_FOLDER="out/$(date +%Y-%m-%d_%H-%M)"
+	#TESTS_FOLDER="out/2015-10-08_19-32"
 	log "test results will be placed in $TESTS_FOLDER"
-	mkdir -p "$TESTS_FOLDER"
+	#mkdir -p "$TESTS_FOLDER"
 
 	i=1
 	while read lat loss bw type; do 
 		log "running test $i (LATENCY: $lat LOSS: $loss BW: $bw TYPE: $type)"
-		shapeNetwork $lat $loss $bw
+		#shapeNetwork $lat $loss $bw
 		testName="${i}-${type}-lat${lat}loss${loss}bw${bw}"
 		runtest $testName $testTime $type $TESTS_FOLDER
-		unshapeNetwork
+		#unshapeNetwork
 		
 		k=0
 		for erunLog in "${CLIENT_ERUNLOG_ARR[@]}" ; do
 			clientRemoteLogDir="/"$(cat $erunLog  | grep -e "test files will be placed in \([-/A-z0-9_]*\)" | sed 's/.* \///')
+			sleep 0.1
 			copyClientLogs "${CLIENT_SCP_ARR[$k]}" "${clientRemoteLogDir}" "${CLIENT_DSTLOGDIR_ARR[$k]}"
 			let k=$k+1			
 		done
-		sleep 2
+		#sleep 2
 		let i=$i+1
 	done <$setupFile
 
 	#log "invoking analysis on all test results..."
-	#runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
-	runCmd "${RUN_COPY_CMD} -s ${setupFile} -t 1 -f ${TESTS_FOLDER}"
+	runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
 }
 
 
@@ -255,11 +245,13 @@ function runtests()
 setupFile="n/a"
 testTime=0
 
-while getopts ":s:t:" opt; do
+while getopts ":s:t:f:" opt; do
   case $opt in
     s) setupFile="$OPTARG"
     ;;
     t) testTime="$OPTARG"
+    ;;
+    f) testsfoler="$OPTARG"
     ;;
     \?) log "Invalid option -$OPTARG" >&2
     ;;
@@ -271,4 +263,4 @@ then
 	usage
 fi
 
-runtests $setupFile $testTime
+runtests $setupFile $testTime $testsfoler
