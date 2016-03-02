@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # this script takes tests folder as an argument
 # it assumes that each testrun subfolder contains
 # log files from the test run in subfolders per consumer 
@@ -26,7 +24,6 @@ ndnping = "ndnping.log"
 ping = "ping.log"
 summary = "summary.txt"
 verbose = False
-printRebufferingsOnly = False
 
 def log(msg):
 	global verbose
@@ -70,7 +67,7 @@ def getNdnPing(file):
 		return [numpy.mean(rtts), numpy.var(rtts)]
 	return [0,0]
 
-summaryRegex = re.compile('run\s(?P<run>[0-9-]+)\sts\s(?P<timestamp>[0-9]+)\schase time\s(?P<chase_time>[0-9]+)\srun time\s(?P<run_time>[0-9.-]+)\sDgen\s(?P<Dgen>[0-9.-]+)\sDarr\s(?P<Darr>[0-9.-]+)\sbuf tar\s(?P<buf_tar>[0-9.-]+)\sbuf est\s(?P<buf_est>[0-9.-]+)\sbuf play\s(?P<buf_play>[0-9.-]+)\srtt est\s(?P<rtt_est>[0-9.-]+)\srtt prime\s(?P<rtt_prime>[0-9.-]+)\slambda d\s(?P<lambda_d>[0-9.-]+)\slambda\s(?P<lambda>[0-9.-]+)')
+summaryRegex = re.compile('run\s(?P<run>[0-9]+)\sts\s(?P<timestamp>[0-9]+)\schase time\s(?P<chase_time>[0-9]+)\srun time\s(?P<run_time>[0-9]+)\sDgen\s(?P<Dgen>[0-9.]+)\sDarr\s(?P<Darr>[0-9.]+)\sbuf tar\s(?P<buf_tar>[0-9.]+)\sbuf est\s(?P<buf_est>[0-9.]+)\sbuf play\s(?P<buf_play>[0-9.]+)\srtt est\s(?P<rtt_est>[0-9.]+)\srtt prime\s(?P<rtt_prime>[0-9.]+)\slambda d\s(?P<lambda_d>[0-9.]+)\slambda\s(?P<lambda>[0-9.]+)')
 def getSummary(file):
 	summary = []
 	for line in open(file):
@@ -78,7 +75,6 @@ def getSummary(file):
 		if m:
 			run = {}
 			run['run_time'] = float(m.group('run_time'))
-			run['chase_time'] = float(m.group('chase_time'))
 			run[StatKeyword.Dgen] = float(m.group('Dgen'))
 			run[StatKeyword.Darr] = float(m.group('Darr'))
 			run[StatKeyword.bufTarget] = float(m.group('buf_tar'))
@@ -92,19 +88,19 @@ def getSummary(file):
 	return summary
 
 def run(folder):
-	global ping, ndnping, summary, printRebufferingsOnly
+	global ping, ndnping, summary
 	r = re.compile('consumer-(?P<consumer_name>.*)\.txt')
-	testrunFolders = sorted(os.listdir(folder))
+	testrunFolders = os.listdir(folder)
 	for testrunFolder in testrunFolders:
 		if not os.path.isdir(os.path.join(folder, testrunFolder)):
 			continue
-		consumerFolders = sorted(os.listdir(os.path.join(folder, testrunFolder)))
+		consumerFolders = os.listdir(os.path.join(folder, testrunFolder))
 		if len(consumerFolders):
 			print testrunFolder
 			for consumerFolder in consumerFolders:
 				if not os.path.isdir(os.path.join(folder, testrunFolder, consumerFolder)):
 					continue
-				hubFolders = sorted(os.listdir(os.path.join(folder, testrunFolder, consumerFolder)))
+				hubFolders = os.listdir(os.path.join(folder, testrunFolder, consumerFolder))
 				if len(hubFolders) > 0:
 					for hubFolder in hubFolders:
 						ndnpingFile = os.path.join(folder, testrunFolder, consumerFolder, hubFolder, ndnping)
@@ -127,42 +123,21 @@ def run(folder):
 								i = 0
 								m = r.search(summaryFile)
 								consumerName = m.group('consumer_name') if m else summaryFile
-								if printRebufferingsOnly == True:
-									wrongRuns = 0
-									avgChaseTime  = 0
-									avgrttEstTime  = 0
-									for run in summ:
-										if run['run_time'] <= 0: 
-											wrongRuns += 1
-										else:
-											avgChaseTime += run['chase_time']
-											avgrttEstTime += run[StatKeyword.rttEst]
-									if (len(summ)-wrongRuns)!=0:
-										avgChaseTime = avgChaseTime/(len(summ)-wrongRuns)
-										avgrttEstTime = avgrttEstTime/(len(summ)-wrongRuns)
-									else:
-										avgChaseTime = -1
-										avgrttEstTime = -1
-									sys.stdout.write(consumerName + "\t"+str(len(summ)-wrongRuns)+"\t"+str(avgChaseTime)+"\t"+str(avgrttEstTime)+"\n")
-								else:
-									print consumerName
-									for run in summ:
-										i += 1								
-										if run['run_time'] > 0:
-											print "{0:.2f}\t{1:0.2f}\t{2:0.2f}\t{3:0.2f}\t{4:0.2f}\t{5:0.2f}\t{6:0.2f}\t{7:0.2f}\t{8:0.2f}\t{9:0.2f}\t{10:0.2f}\t{11:0.2f}\t{12:0.2f}\t{13:0.2f}".format(run['run_time'], run[StatKeyword.rttPrime], \
-												run[StatKeyword.rttEst], ndnRtt, ndnRttVar, pingRtt, pingVar,\
-												run[StatKeyword.Dgen], run[StatKeyword.Darr], run[StatKeyword.lambdaD], run[StatKeyword.lambdaC],
-												run[StatKeyword.bufEstimate], run[StatKeyword.bufPlayable], run[StatKeyword.bufTarget])
+								print consumerName
+								for run in summ:
+									i += 1
+									if run['run_time'] > 0:
+										sys.stdout.write(consumerFolder + "\t"+str(len(summ))+"\n")
 
 #******************************************************************************
 def usage():
-	print "usage: "+sys.argv[0]+" -f<tests_folder> [-r]"
+	print "usage: "+sys.argv[0]+" -f<tests_folder>"
 	sys.exit(0)
 
 def main():
-	global verbose, printRebufferingsOnly
+	global verbose
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "vrf:", ["-v", "-r", "test-folder="])
+		opts, args = getopt.getopt(sys.argv[1:], "vf:", ["-v", "test-folder="])
 	except getopt.GetoptError as err:
 		print str(err)
 		usage()
@@ -172,8 +147,6 @@ def main():
 			testFolder = a
 		elif o in ("-v"):
 			verbose = True
-		elif o in ("-r"):
-			printRebufferingsOnly = True
 		else:
 			assert False, "unhandled option "+o
 	if not 'testFolder' in locals():

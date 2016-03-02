@@ -9,7 +9,7 @@ do
 	#echo "file is $file"
 	grepfilename=$(echo "$file" | grep -o "consumer\([-/A-z0-9_]*\)")
 	#echo "file name is $grepfilename"
-	analyzeCmd='analyze.py "${file}" 10 "${folder}/summary-${grepfilename}.txt" --no-headers >> "${folder}/stats-${grepfilename}.log"'
+	analyzeCmd='analyze_morestat.py "${file}" 10 "${folder}/summary-${grepfilename}.txt" --no-headers >> "${folder}/stats-${grepfilename}.log"'
 	echo "running analysis on $file...."
 	eval $analyzeCmd
 	echo "done!"

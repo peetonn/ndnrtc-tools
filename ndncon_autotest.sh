@@ -2,14 +2,15 @@
 DEBUG=0
 
 PREFIX="/a/b/c"
-TEST_IFACE="eth1"
-CPIP1="131.179.142.30"
+TEST_IFACE="eth0"
+CPIP1="172.1.1.33"
 CPUSER1="remap"
-CPIP2="131.179.142.33"
+#CPIP2="192.168.1.66"
+CPIP2="172.1.1.34"
 CPUSER2="remap"
 
-NDNCON_USER1="test1"
-NDNCON_USER2="test2"
+NDNCON_USER1="test2"
+NDNCON_USER2="test1"
 
 NDN_DAEMON=nfd
 NDN_DAEMON_START=nfd-start
@@ -17,7 +18,9 @@ NDN_DAEMON_STOP=nfd-stop
 NDN_DAEMON_LOG="nfd.log"
 NDN_DAEMON_REG_PREFIX="nfdc register"
 
-RUN_ANALYSIS_CMD="analyze.sh"
+#RUN_ANALYSIS_CMD="analyze.sh"
+RUN_COPY_CMD="ndncon_autotest_copy_log.sh"
+CAPUSAGE_INTERVAL=10
 
 function log()
 {
@@ -167,6 +170,9 @@ function runtest()
 	test_time=$2
 	test_type=$3
 	tests_folder=$4
+	CLIENT_ERUNLOG_ARR=()
+	CLIENT_DSTLOGDIR_ARR=()
+	CLIENT_SCP_ARR=()
 	
 	test_folder="$tests_folder/$test_name"
 	mkdir -p $test_folder
@@ -174,11 +180,22 @@ function runtest()
 	setupNfd $test_folder
 	runCp $CPIP2 $CPUSER2 $test_time $test_type $test_folder $NDNCON_USER2 $NDNCON_USER1
 	runCp $CPIP1 $CPUSER1 $test_time $test_type $test_folder $NDNCON_USER1 $NDNCON_USER2
-	sleep 10
+	sleep 5
 	runHub $test_folder
 
 	log "running test (logs in ${test_folder})..."
-	sleep $test_time
+	runTime=0
+    while [ $runTime -le $test_time ] ; do
+    	sleep $CAPUSAGE_INTERVAL
+    	#takeScreenshot $hub $address
+    	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	timestamp_unix=$(date +%s)
+    	nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, nfd-usage: $nfd_usage" >> $test_folder/resourceNFDUsage-hub.log
+
+    	let runTime+=$CAPUSAGE_INTERVAL
+    done
+	# sleep $test_time
 	sleep 15
 	cleanupHub
 	sleep 5
@@ -194,6 +211,7 @@ function copyClientLogs()
 	srcDir=$2
 	dstDir=$3
 	
+	sleep 5
 	log "copying log files from ${scpCred}:${srcDir}/* to ${dstDir}"
 	runCmd "scp -r ${scpCred}:${srcDir}/* ${dstDir}"
 	log "done"
@@ -228,8 +246,9 @@ function runtests()
 		let i=$i+1
 	done <$setupFile
 
-	log "invoking analysis on all test results..."
-	runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
+	#log "invoking analysis on all test results..."
+	#runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
+	runCmd "${RUN_COPY_CMD} -s ${setupFile} -t 1 -f ${TESTS_FOLDER}"
 }
 
 

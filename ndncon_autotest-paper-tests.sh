@@ -1,15 +1,16 @@
 #!/bin/bash
 DEBUG=0
 
-#PREFIX="/ndn/edu/ucla"
-TEST_IFACE="eth0"
-CPIP1="192.168.1.111"
+PREFIX="/a/b/c"
+TEST_IFACE="eth1"
+CPIP1="172.1.1.33"
 CPUSER1="remap"
-CPIP2="192.168.1.222"
+#CPIP2="192.168.1.66"
+CPIP2="172.1.1.34"
 CPUSER2="remap"
 
-NDNCON_USER1="test3"
-NDNCON_USER2="test4"
+NDNCON_USER1="test2"
+NDNCON_USER2="test1"
 
 NDN_DAEMON=nfd
 NDN_DAEMON_START=nfd-start
@@ -17,10 +18,9 @@ NDN_DAEMON_STOP=nfd-stop
 NDN_DAEMON_LOG="nfd.log"
 NDN_DAEMON_REG_PREFIX="nfdc register"
 
-# RUN_ANALYSIS_CMD="analyze.sh"
-# RUN_BUILD_RESULTS="build_results.py"
-# RUN_BUILD_SHORT_RESULTS="build_results.py -r"
-RUN_COPY_CMD="ndncon_autotest_tb_copy_log.sh"
+#RUN_ANALYSIS_CMD="analyze.sh"
+RUN_COPY_CMD="ndncon_autotest_copy_log.sh"
+CAPUSAGE_INTERVAL=10
 
 function log()
 {
@@ -118,28 +118,24 @@ function runCp()
 	local test_type
 	local cpIp
 	local cpUser
- 	local producer
- 	local consumer
- 	local scpdest
- 	local producerHub
- 	local consumerHub
+        local producer
+        local consumer
+        local scpdest
 
 	cpIp=$1
 	cpUser=$2
 	test_time=$3
 	test_type=$4
 	tests_folder=$5
-	producer=$6
-	consumer=$7
-	producerHub=$8
-	consumerHub=$9
-
+        producer=$6
+        consumer=$7
+        scpdest=$8
 	eruntestLog=${tests_folder}/eruntest-${producer}.out
 	clientDstLogDir="$test_folder/$producer"
 	mkdir -p $clientDstLogDir
 
 	log "starting consumer-producer ${cpIp} (${cpUser}-$producer, fetching from $consumer, test type ${test_type})"
-	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest-tb.sh -o /ndnproject/out -t ${test_time} -p ${producer} -c ${consumer} -${test_type} -k ${producerHub} -l ${consumerHub}\" &> ${eruntestLog}"
+	RUNTEST_CMD="ssh -f ${cpUser}@${cpIp} \"/ndnproject/ndnrtc-tools/eruntest.sh -o /ndnproject/out -t ${test_time} -h /ndnproject/ndnrtc-tools/hubfile -p ${producer} -c ${consumer} -${test_type}\" &> ${eruntestLog}"
 	runCmd "${RUNTEST_CMD}"
 	log "logs are in ${eruntestLog}"
 
@@ -170,14 +166,10 @@ function runtest()
 	local test_time
 	local test_type
 
-	local client1Hub=$1
-	local client2Hub=$2
-
-	test_name=$3
-	test_time=$4
-	test_type=$5
-	tests_folder=$6
-
+	test_name=$1
+	test_time=$2
+	test_type=$3
+	tests_folder=$4
 	CLIENT_ERUNLOG_ARR=()
 	CLIENT_DSTLOGDIR_ARR=()
 	CLIENT_SCP_ARR=()
@@ -185,13 +177,30 @@ function runtest()
 	test_folder="$tests_folder/$test_name"
 	mkdir -p $test_folder
 
-	runCp $CPIP2 $CPUSER2 $test_time $test_type $test_folder $NDNCON_USER2 $NDNCON_USER1 $client2Hub $client1Hub
-	runCp $CPIP1 $CPUSER1 $test_time $test_type $test_folder $NDNCON_USER1 $NDNCON_USER2 $client1Hub $client2Hub
-	sleep 10
+	setupNfd $test_folder
+	runCp $CPIP2 $CPUSER2 $test_time $test_type $test_folder $NDNCON_USER2 $NDNCON_USER1
+	# make small delay so that one of the clients have it's prod rate estimator settled
+	sleep 2
+	runCp $CPIP1 $CPUSER1 $test_time $test_type $test_folder $NDNCON_USER1 $NDNCON_USER2
+	sleep 5
+	runHub $test_folder
 
 	log "running test (logs in ${test_folder})..."
-	sleep $test_time
+	runTime=0
+    while [ $runTime -le $test_time ] ; do
+    	sleep $CAPUSAGE_INTERVAL
+    	#takeScreenshot $hub $address
+    	timestamp=$(date +"%T") #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	timestamp_unix=$(date +%s)
+    	nfd_usage=$(ps -h -p `pgrep nfd | tr "\\n" "," | sed 's/,$//'` -o %cpu,%mem,vsz,rss | awk 'NR>1') #>>$TESTS_FOLDER/$hub/resourceUsage-${PRODUCER_NAME}.log
+    	echo "timestamp: $timestamp, timestamp_unix: $timestamp_unix, nfd-usage: $nfd_usage" >> $test_folder/resourceNFDUsage-hub.log
+
+    	let runTime+=$CAPUSAGE_INTERVAL
+    done
+	# sleep $test_time
 	sleep 15
+	cleanupHub
+	sleep 5
 	log "test completed."
 }
 
@@ -204,6 +213,7 @@ function copyClientLogs()
 	srcDir=$2
 	dstDir=$3
 	
+	sleep 5
 	log "copying log files from ${scpCred}:${srcDir}/* to ${dstDir}"
 	runCmd "scp -r ${scpCred}:${srcDir}/* ${dstDir}"
 	log "done"
@@ -221,10 +231,12 @@ function runtests()
 	mkdir -p "$TESTS_FOLDER"
 
 	i=1
-	while read client1Hub client2Hub type; do 
-		log "running test $i ($client1Hub <-> $client2Hub)"
-		testName="${i}-${type}-${client1Hub}-${client2Hub}"
-		runtest $client1Hub $client2Hub $testName $testTime $type $TESTS_FOLDER
+	while read lat loss bw type; do 
+		log "running test $i (LATENCY: $lat LOSS: $loss BW: $bw TYPE: $type)"
+		shapeNetwork $lat $loss $bw
+		testName="${i}-${type}-lat${lat}loss${loss}bw${bw}"
+		runtest $testName $testTime $type $TESTS_FOLDER
+		unshapeNetwork
 		
 		k=0
 		for erunLog in "${CLIENT_ERUNLOG_ARR[@]}" ; do
@@ -237,10 +249,8 @@ function runtests()
 	done <$setupFile
 
 	#log "invoking analysis on all test results..."
+	#runCmd "${RUN_ANALYSIS_CMD} ${TESTS_FOLDER}"
 	runCmd "${RUN_COPY_CMD} -s ${setupFile} -t 1 -f ${TESTS_FOLDER}"
-	#runCmd "${RUN_BUILD_RESULTS} -f ${TESTS_FOLDER}"
-	#runCmd "${RUN_BUILD_SHORT_RESULTS} -f ${TESTS_FOLDER}"
-
 }
 
 
