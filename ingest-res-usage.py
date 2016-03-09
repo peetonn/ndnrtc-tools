@@ -12,6 +12,10 @@ import time
 import errno
 import stat
 import json
+import datetime
+import threading
+import thread
+import signal
 from copy import deepcopy
 from influxdb import InfluxDBClient
 
@@ -53,7 +57,7 @@ def getProcessResources(processName):
 def ingestProcessResources(adaptor, processName, username, hubLabel, resDict):
 	metric = IngestAdaptor.metricGenericTemplate
 	metric['tags'] = {'process':processName, 'user':username, 'hub':hubLabel}
-	metric['timestamp'] = adaptor.fromUnixTimestamp(time.time())
+	metric['timestamp'] = time.time()*1000
 
 	for m in resDict:
 		md = deepcopy(metric)
@@ -149,7 +153,7 @@ class StatCollector(object):
 		metric['tags'] = {'process':'ndncon', 'hubLabel':self.hubLabel_, 'producer':jsonData['stream']['user'],\
 			'consumer':self.user_, 'stream': jsonData['stream']['stream'],
 			'producer-prefix': jsonData['stream']['prefix']}
-		metric['timestamp'] = self.adaptor_.fromMilliseconds(jsonData['stats']['timestamp'])
+		metric['timestamp'] = jsonData['stats']['timestamp']
 		metric['fields']['fetched_streams'] = jsonData['stream']['totalStreams']
 		for kw in self.keywords_:
 			if kw in jsonData['stats']:
@@ -157,6 +161,7 @@ class StatCollector(object):
 				m = deepcopy(metric)
 				m['metric'] = kw
 				m['value'] = float(value)
+				a = time.time()
 				self.adaptor_.metricFunc(m)
 
 #******************************************************************************
@@ -177,6 +182,19 @@ class IngestAdaptor(object):
 	def __init__(self, timeOffset = 0):
 		self.timeOffset = timeOffset
 		self.baseTimestamp = 0
+		self.batch = []
+		self.lock = threading.Lock()
+		self.running = True
+		self.workerThread = thread.start_new_thread(self.processMetrics, ())
+		signal.signal(signal.SIGINT, self.signal_handler)
+
+	def signal_handler(self, signal, frame):
+		self.finalize()
+		self.stop()
+		exit(0)
+
+	def stop(self):
+		self.running = False
 
 	def connect(self):
 		pass
@@ -203,15 +221,43 @@ class IngestAdaptor(object):
 	def writeBatch(self, metrics):
 		pass
 
+	def copyBatch(self, newBatch):
+		if self.lock.acquire(False):
+			batchCopy = deepcopy(newBatch)
+			self.batch.extend(batchCopy)
+			self.lock.release()
+			return True
+		else:
+			return False
+
+	def processMetrics(self):
+		while self.running:
+			self.lock.acquire()
+			batchLen = len(self.batch)
+			batchCopy = deepcopy(self.batch)
+			self.batch = []
+			self.lock.release()
+			if batchLen > 0:
+				if not self.dryRun:
+					sys.stdout.write("writing batch of " + str(batchLen) + " metrics...")
+				a = time.time()
+				self.writeBatch(batchCopy)
+				if not self.dryRun:
+					sys.stdout.write(str(time.time()-a)+' sec\n')
+				self.writeCtr += batchLen
+				if self.writeCtr-self.lastWrite >= 1000 and not self.dryRun:
+					print "wrote "+str(self.writeCtr-self.lastWrite)+" measurements. "+str(self.writeCtr)+" total."
+					self.lastWrite = self.writeCtr
+			time.sleep(0.1)
+
 	def metricFunc(self, json):
+		if not self.running: return
 		self.metrics.append(json)
-		if len(self.metrics) == self.batchSize:
-			self.writeBatch(self.metrics)
-			self.writeCtr += self.batchSize
-			self.metrics = []
-			if self.writeCtr-self.lastWrite >= 1000 and not self.dryRun:
-				print "wrote "+str(self.writeCtr-self.lastWrite)+" measurements. "+str(self.writeCtr)+" total."
-				self.lastWrite = self.writeCtr
+		if len(self.metrics) >= self.batchSize:
+			if self.copyBatch(self.metrics):
+				self.metrics = []
+			else:
+				sys.stdout.write('.')
 		if not json['metric'] in self.metricWriteCounter.keys():
 			self.metricWriteCounter[json['metric']] = 0
 		self.metricWriteCounter[json['metric']] += 1
@@ -267,23 +313,23 @@ class InfluxAdaptor(IngestAdaptor):
 		return int(unixTimestamp*1000000000) # nanosec
 
 	def writeBatch(self, metrics):
-		self.uniquefyTimestamps(metrics)
 		if self.dryRun:
 			IngestAdaptor.printMetrics(metrics)
 		else:
+			self.uniquefyTimestamps(metrics)
 			batch = []
-			for m in self.metrics:
+			for m in metrics:
 				batch.append(self.toInfluxJson(m))
-				try:
-					self.influxClient.write_points(batch)
-				except Exception as e:
-					print('got error while trying to send metric: '+str(m) + '\n'+str(e))
-					raise e
+			try:
+				self.influxClient.write_points(batch)
+			except Exception as e:
+				print('got error while trying to send metric: '+str(m) + '\n'+str(e))
+				raise e
 
 	def toInfluxJson(self, genericJson):
 		influxJson = deepcopy(self.influxJsonTemplate)
 		influxJson['measurement'] = genericJson['metric']
-		influxJson['time'] = genericJson['timestamp']
+		influxJson['time'] = self.fromMilliseconds(genericJson['timestamp'])
 		influxJson['fields']['value'] = genericJson['value']
 		for key in genericJson['fields'].keys():
 			influxJson['fields'][key] = genericJson['fields'][key]
@@ -421,7 +467,7 @@ class TextFileWatcher(object):
             for fid, f in list(self._files_map.items()):
                 self.readlines(f)
             if not blocking:
-                return
+            	return
             time.sleep(interval)
 
     def log(self, line):
@@ -692,7 +738,7 @@ def main():
 		if port: influxPort = port
 		ingestAdaptor = InfluxAdaptor(user=influx_username, password=influx_password, dbname=influx_resDB, timeOffset=0, host=host, port=influxPort)
 
-	ingestAdaptor.batchSize = len(resourcesToTrack)
+	ingestAdaptor.batchSize = len(resourcesToTrack)+len(keywords)
 	ingestAdaptor.dryRun = dryRun
 
 	statCollector = None
