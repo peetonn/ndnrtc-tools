@@ -145,18 +145,18 @@ class StatCollector(object):
 		return True
 
 	def sendMetric(self, jsonData):
-		metric = IngestAdaptor.metricGenericTemplate
+		metric = deepcopy(IngestAdaptor.metricGenericTemplate)
 		metric['tags'] = {'process':'ndncon', 'hubLabel':self.hubLabel_, 'producer':jsonData['stream']['user'],\
 			'consumer':self.user_, 'stream': jsonData['stream']['stream'],
 			'producer-prefix': jsonData['stream']['prefix']}
-		metric['timestamp'] = jsonData['stats']['timestamp']
+		metric['timestamp'] = self.adaptor_.fromMilliseconds(jsonData['stats']['timestamp'])
 		metric['fields']['fetched_streams'] = jsonData['stream']['totalStreams']
 		for kw in self.keywords_:
 			if kw in jsonData['stats']:
 				value = jsonData['stats'][kw]
 				m = deepcopy(metric)
 				m['metric'] = kw
-				m['value'] = value
+				m['value'] = float(value)
 				self.adaptor_.metricFunc(m)
 
 #******************************************************************************
@@ -182,6 +182,9 @@ class IngestAdaptor(object):
 		pass
 
 	def timeFunc(self, match):
+		return 0
+
+	def fromMilliseconds(self, timestamp):
 		return 0
 
 	def fromUnixTimestamp(self, unixTimestamp):
@@ -248,11 +251,6 @@ class InfluxAdaptor(IngestAdaptor):
 		self.baseTimestamp = 1234560000000 # millisec
 
 	def connect(self, host, port, user, password, dbname):
-		# user = 'parser'
-		# password = 'letmein'
-		# dbname = 'test'
-		dbuser = 'parser'
-		dbuser_password = 'letmein'
 		self.influxClient = InfluxDBClient(host, port, user, password, dbname)
 
 	def timeFunc(self, match):
@@ -261,6 +259,9 @@ class InfluxAdaptor(IngestAdaptor):
 			self.startTimestamp = timestamp
 		unixTimestamp = self.baseTimestamp + (timestamp - self.startTimestamp)
 		return unixTimestamp*1000000 # nanosec
+
+	def fromMilliseconds(self, timestamp):
+		return int(timestamp*1000000)
 
 	def fromUnixTimestamp(self, unixTimestamp):
 		return int(unixTimestamp*1000000000) # nanosec
@@ -273,7 +274,11 @@ class InfluxAdaptor(IngestAdaptor):
 			batch = []
 			for m in self.metrics:
 				batch.append(self.toInfluxJson(m))
-			self.influxClient.write_points(batch)
+				try:
+					self.influxClient.write_points(batch)
+				except Exception as e:
+					print('got error while trying to send metric: '+str(m) + '\n'+str(e))
+					raise e
 
 	def toInfluxJson(self, genericJson):
 		influxJson = deepcopy(self.influxJsonTemplate)
@@ -301,6 +306,9 @@ class TsdbAdaptor(IngestAdaptor):
 			self.startTimestamp = timestamp
 		unixTimestamp = self.baseTimestamp + (timestamp - self.startTimestamp) + self.timeOffset
 		return unixTimestamp
+
+	def fromMilliseconds(self, timestamp):
+		return timestamp
 
 	def fromUnixTimestamp(self, unixTimestamp):
 		return int(unixTimestamp*1000) # milisec
@@ -630,6 +638,8 @@ def main():
 	influx_username = None
 	influx_password = None
 	influx_dataBaseName = None
+	influx_resDB = "db_resources"
+	influx_ndnrtcDB = "db_ndnrtc"
 
 	username = None
 	hubLabel = None
@@ -670,9 +680,9 @@ def main():
 		usage()
 		exit(2)
 
-	if not useTsdbAdaptor and not (influx_username and influx_password and influx_dataBaseName):
-		print influx_username, influx_password, influx_dataBaseName
-		print "asked for influx adaptor, but didn't provide username, password and db name. aborting"
+	if not useTsdbAdaptor and not (influx_username and influx_password):
+		print influx_username, influx_password
+		print "asked for influx adaptor, but didn't provide username or password. aborting"
 		exit(2)
 
 	if useTsdbAdaptor:
@@ -680,10 +690,11 @@ def main():
 		ingestAdaptor = TsdbAdaptor(timeOffset=0, tsdbUri='http://{0}:{1}/api/put?details'.format(host, tsdbPort))
 	else:
 		if port: influxPort = port
-		ingestAdaptor = InfluxAdaptor(user=influx_username, password=influx_password, dbname=influx_dataBaseName, timeOffset=0, host=host, port=influxPort)
+		ingestAdaptor = InfluxAdaptor(user=influx_username, password=influx_password, dbname=influx_resDB, timeOffset=0, host=host, port=influxPort)
 
 	ingestAdaptor.batchSize = len(resourcesToTrack)
 	ingestAdaptor.dryRun = dryRun
+
 	statCollector = None
 	if len(keywords) > 0:
 		print "tracking metrics: "+str(keywords)
