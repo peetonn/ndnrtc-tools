@@ -13,6 +13,9 @@ DefaultTimeFunc = lambda match: int(match.group('timestamp'))
 # /ndn/edu/ucla/remap/ndnrtc/user/clockwork_ndn/streams/camera/low/key/3991/data/%00%00/5/119730/115739/1/59709
 # 
 # these groups are available if regex match:
+# - user - user name
+# - stream - media stream name
+# - thread - media thread name
 # - frame_type - delta/key
 # - frame_no - frame number
 # - data_type - data/parity
@@ -20,7 +23,8 @@ DefaultTimeFunc = lambda match: int(match.group('timestamp'))
 # - play_no - frame playback number (optional, valid for data names only, not interest names)
 # - segnum - total number of segments (optional, valid for data names only)
 # - psegnum - total number of parity segments (optional, valid for data names only)
-NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
+# NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
+NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<user>[A-z0-9_\-\+]+)+/streams/(?P<stream>[A-z0-9_\-\+]+)+/(?P<thread>[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
 
 # statistics captions
 NdnRtcStatCaptions = [
@@ -122,7 +126,7 @@ def parseLog(file, actionArray):
  	            break
  	      nLines+=1
  	    # for line
- 	    print 'parsed '+str(nLines)+' lines'
+ 	    # print 'parsed '+str(nLines)+' lines'
 # with
 
 def getSummaryStat(logFile):

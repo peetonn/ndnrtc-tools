@@ -39,7 +39,7 @@ def printCurrentBufferState():
 	else:
 		if len(currentBufferState.frames):
 			if currentBufferState.frames[0].assembledLevel < 100:
-				print "lambda_d "+lastLambda
+				print "lambda_d "+str(lastLambda)
 				print currentBufferState
 			else:
 				return

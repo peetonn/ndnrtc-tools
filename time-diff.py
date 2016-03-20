@@ -2,10 +2,14 @@
 
 import sys
 import getopt
+import re
 
 def getTimestamp(line):
 	try:
-		ts = float(line.split("\t")[0])
+		ts = 0
+		comps = re.split("[\t ]+", line)
+		if len(comps) > 0:
+			ts = float(comps[0])
 	except:
 		return None
 	return ts

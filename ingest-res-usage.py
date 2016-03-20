@@ -27,7 +27,7 @@ def runCmd(cmd):
 	return resultStr
 
 def getProcessPid(processName):
-	getPidCmdTemplate = 'pgrep {0} | tr "\\n" "," | sed \'s/,$//\''
+	getPidCmdTemplate = 'pgrep ^{0}$ | tr "\\n" "," | sed \'s/,$//\''
 
 	cmd = getPidCmdTemplate.format(processName)
 	pidStr = runCmd(cmd)

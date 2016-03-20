@@ -20,13 +20,16 @@ class StatKeyword(Enum):
   recovered = 10
   rescued = 11
   rtx = 12
+  lat = 13
+  rttVar = 14
 
   def __str__(self):
     return {StatKeyword.Dgen:'Dgen', StatKeyword.Darr:'Darr',\
     StatKeyword.bufTarget:'buf tar', StatKeyword.bufEstimate:'buf est', StatKeyword.bufPlayable:'buf play',\
     StatKeyword.rttEst:'rtt est', StatKeyword.rttPrime:'rtt prime',\
     StatKeyword.lambdaD:'lambda d', StatKeyword.lambdaC:'lambda',\
-    StatKeyword.rtx:'rtx', StatKeyword.rescued:'resc', StatKeyword.recovered:'recover'}[self]
+    StatKeyword.rtx:'rtx', StatKeyword.rescued:'resc', StatKeyword.recovered:'recover',
+    StatKeyword.lat:'lat est', StatKeyword.rttVar:'rtt var'}[self]
 
 def statEntryRegex(statEntry):
   return str(statEntry)
@@ -35,7 +38,8 @@ statRegexString = '(?P<stat_entry>'+statEntryRegex(StatKeyword.Dgen)+'|'+statEnt
   statEntryRegex(StatKeyword.bufTarget)+'|'+statEntryRegex(StatKeyword.bufEstimate)+'|'+statEntryRegex(StatKeyword.bufPlayable)+'|'+\
   statEntryRegex(StatKeyword.rttEst)+'|'+statEntryRegex(StatKeyword.rttPrime)+'|'+\
   statEntryRegex(StatKeyword.lambdaD)+'|'+statEntryRegex(StatKeyword.lambdaC)+'|'+\
-  statEntryRegex(StatKeyword.recovered)+'|'+statEntryRegex(StatKeyword.rescued)+'|'+statEntryRegex(StatKeyword.rtx)+')\\t(?P<value>[0-9.-]+)'
+  statEntryRegex(StatKeyword.recovered)+'|'+statEntryRegex(StatKeyword.rescued)+'|'+statEntryRegex(StatKeyword.rtx)+'|'+\
+  statEntryRegex(StatKeyword.lat)+'|'+statEntryRegex(StatKeyword.rttVar)+')\\t(?P<value>[0-9.-]+)'
 statRegex = re.compile(statRegexString)
 
 def closeStatBlock(timestamp):
@@ -172,7 +176,7 @@ if __name__ == '__main__':
   statBlockNum = 0
   runBlock = OrderedDict([(str(StatKeyword.Dgen),[]), (str(StatKeyword.Darr),[]), (str(StatKeyword.bufTarget),[]), (str(StatKeyword.bufEstimate),[]),\
   (str(StatKeyword.bufPlayable),[]), (str(StatKeyword.rttEst),[]), (str(StatKeyword.rttPrime),[]), (str(StatKeyword.lambdaD),[]), (str(StatKeyword.lambdaC),[]),\
-  (str(StatKeyword.rtx), []), (str(StatKeyword.recovered), []), (str(StatKeyword.rescued), [])])
+  (str(StatKeyword.rtx), []), (str(StatKeyword.recovered), []), (str(StatKeyword.rescued), []), (str(StatKeyword.lat), []), (str(StatKeyword.rttVar), [])])
   statBlock = runBlock.copy()
 
   chaseTrackRegexString = 'phase Chasing finished in (?P<chase_time>[0-9]+) msec'
