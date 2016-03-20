@@ -187,13 +187,13 @@ if __name__ == '__main__':
 
   interestExpressRegex  = 'express\t'+ndnlog.NdnRtcNameRegexString
   interestExpressActions = {}
-  interestExpressActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.stat.__str__(), '.iqueue', interestExpressRegex)
+  interestExpressActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.debug.__str__(), '.iqueue', interestExpressRegex)
   interestExpressActions['tfunc'] = ndnlog.DefaultTimeFunc
   interestExpressActions['func'] = onInterest
 
   dataReceivedRegex  = 'data '+ndnlog.NdnRtcNameRegexString
   dataReceivedActions = {}
-  dataReceivedActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.stat.__str__(), '.consumer-pipeliner', dataReceivedRegex)
+  dataReceivedActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.debug.__str__(), '.consumer-pipeliner', dataReceivedRegex)
   dataReceivedActions['tfunc'] = ndnlog.DefaultTimeFunc
   dataReceivedActions['func'] = onData
 
@@ -204,7 +204,7 @@ if __name__ == '__main__':
   rebufferingActions['func'] = onRebuffering
 
   statEntryActions = {}
-  statEntryActions['pattern'] = ndnlog.compileNdnLogPattern(NdnLogToken.stat.__str__(), '.*', statRegexString)
+  statEntryActions['pattern'] = ndnlog.compileNdnLogPattern('.*', '.*', statRegexString)
   statEntryActions['tfunc'] = timeFunc
   statEntryActions['func'] = onStatEntry
 
