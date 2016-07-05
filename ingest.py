@@ -57,6 +57,17 @@ def getProcessResources(processName):
 		return resDict
 	return None
 
+def getInterfaceBytes(iface):
+	getReceivedBytesTemplate = "ifconfig "+str(iface)+" | grep 'RX bytes' | awk '{print $2}'"
+	getSentBytesTemplate = "ifconfig "+str(iface)+" | grep 'TX bytes' | awk '{print $6}'"
+	rxbytesStr = runCmd(getReceivedBytesTemplate)
+	txbytesStr = runCmd(getSentBytesTemplate)
+	if len(rxbytesStr.split(':')) == 2 and len(txbytesStr.split(':')) == 2:
+		rxBytes = int(rxbytesStr.split(':')[1])
+		txBytes = int(txbytesStr.split(':')[1])
+		return (rxBytes, txBytes)
+	return None
+
 #******************************************************************************
 # resource monitoring
 def ingestProcessResources(adaptor, processName, tags, resDict):
@@ -78,13 +89,32 @@ def ingestResources(adaptor, tags, processResDict):
 		if processResDict[processName]:
 			ingestProcessResources(adaptor, processName, tags, processResDict[processName])
 
-def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector):
+def ingestNetworkResources(adaptor, tags, networkBytes, iface):
+	metric = IngestAdaptor.metricGenericTemplate
+	metric['tags'] = {'iface':iface}
+	for k in tags.keys():
+		metric['tags'][k] = tags[k]
+
+	metric['timestamp'] = time.time()*1000
+
+	md = deepcopy(metric)
+	md['metric'] = "rxbytes"
+	md['value'] = networkBytes[0]
+	adaptor.metricFunc(md)
+
+	md = deepcopy(metric)
+	md['metric'] = "txbytes"
+	md['value'] = networkBytes[1]
+	adaptor.metricFunc(md)
+
+def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector, networkInterface):
 	ingestFrequency = 1.
 	delta = 0.1
 	appName = "ndnrtc-client"
 	nfdName = "nfd"
 	ndnconResources = None
 	nfdResources = None
+	networkBytes = None
 	elapsed = 0
 	while True:
 		if elapsed >= 1/ingestFrequency:
@@ -93,6 +123,9 @@ def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector):
 				ndnconResources = getProcessResources(appName)
 			if isTrackingNfd:
 				nfdResources = getProcessResources(nfdName)
+			if networkInterface:
+				networkBytes = getInterfaceBytes(networkInterface)
+				ingestNetworkResources(ingestAdaptor, tags, networkBytes, networkInterface)
 			ingestResources(ingestAdaptor, tags, {appName:ndnconResources, nfdName:nfdResources})
 		if statCollector:
 			statCollector.run()
@@ -679,7 +712,7 @@ def main():
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "", ["username=", "hub=", \
 			"no-ndncon", "no-nfd", "dry-run", "iuser=", "ipassword=", "idb=", \
-			"influx-adaptor", "port=", "host=", "metrics=", "stat-folder=", "tags="])
+			"influx-adaptor", "port=", "host=", "metrics=", "stat-folder=", "tags=", "iface="])
 	except getopt.GetoptError as err:
 		print str(err)
 		usage()
@@ -705,6 +738,7 @@ def main():
 	keywords = []
 	statFolder = "/tmp"
 	userTags = {}
+	iface = None
 	for o, a in opts:
 		if o in ("--username"):
 			userTags['user'] = a
@@ -742,6 +776,8 @@ def main():
 					key = kv[0]
 					value = kv[1]
 					userTags[key] = value
+		elif o in ("--iface"):
+			iface = a
 		else:
 			assert False, "unhandled option "+o
 	if not username:
@@ -769,7 +805,7 @@ def main():
 		statCollector = StatCollector(keywords, ingestAdaptor, statFolder, userTags)
 
 	if trackNdncon or trackNfd or statCollector:
-		run(userTags, trackNdncon, trackNfd, ingestAdaptor, statCollector)
+		run(userTags, trackNdncon, trackNfd, ingestAdaptor, statCollector, iface)
 
 if __name__ == '__main__':
 	main()
