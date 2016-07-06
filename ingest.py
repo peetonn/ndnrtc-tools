@@ -199,14 +199,22 @@ class StatCollector(object):
 		for k in self.tags_.keys():
 			metric['tags'][k] = self.tags_[k]
 		metric['timestamp'] = jsonData['stats']['timestamp']
+		# we name metric from stat group name
+		# its' value will be the first value in json
+		# other values will be fields
+		# for example, this metric captured from "buffering-client1-camera.stat" (stat group 'buffering'): 
+		#		{"timestamp":1467760216321.00,"jitterPlay":139.00,"jitterEst":241.00,"jitterTar":150.00}
+		# therefore, metric will be:
+		# { 'metric': 'buffering'; 'value':139, 'fields':{"jitterPlay":139.00,"jitterEst":241.00,"jitterTar":150.00}; ...}
+		metric['metric'] = jsonData['stream']['stat_group']
 		for kw in self.keywords_:
+			metricNamed = False
 			if kw in jsonData['stats']:
 				value = jsonData['stats'][kw]
-				m = deepcopy(metric)
-				m['metric'] = kw
-				m['value'] = float(value)
-				a = time.time()
-				self.adaptor_.metricFunc(m)
+				if not metricNamed:
+					metric['value'] = value
+				metric['fields'][kw] = value
+		self.adaptor_.metricFunc(metric)
 
 #******************************************************************************
 # classes borrowed & adapted from https://github.com/peetonn/ndnrtc-tools
@@ -381,6 +389,7 @@ class InfluxAdaptor(IngestAdaptor):
 			influxJson['tags'][key] = genericJson['tags'][key]
 		return influxJson
 
+## DEPRECATED
 class TsdbAdaptor(IngestAdaptor):
 	tsdbJsonTemplate = { "metric": None, "timestamp": None, "value": None, "tags": {} }
 
