@@ -70,11 +70,13 @@ def getInterfaceBytes(iface):
 
 #******************************************************************************
 # resource monitoring
-def ingestProcessResources(adaptor, processName, tags, resDict):
+def ingestProcessResources(adaptor, processName, tags, fields, resDict):
 	metric = IngestAdaptor.metricGenericTemplate
 	metric['tags'] = {'process':processName}
 	for k in tags.keys():
 		metric['tags'][k] = tags[k]
+	for k in fields.keys():
+		metric['fields'][k] = fields[k]
 
 	metric['timestamp'] = time.time()*1000
 
@@ -84,16 +86,18 @@ def ingestProcessResources(adaptor, processName, tags, resDict):
 		md['value'] = resDict[m]
 		adaptor.metricFunc(md)
 
-def ingestResources(adaptor, tags, processResDict):
+def ingestResources(adaptor, tags, fields, processResDict):
 	for processName in processResDict:
 		if processResDict[processName]:
-			ingestProcessResources(adaptor, processName, tags, processResDict[processName])
+			ingestProcessResources(adaptor, processName, tags, fields, processResDict[processName])
 
-def ingestNetworkResources(adaptor, tags, networkBytes, iface):
+def ingestNetworkResources(adaptor, tags, fields, networkBytes, iface):
 	metric = IngestAdaptor.metricGenericTemplate
 	metric['tags'] = {'iface':iface}
 	for k in tags.keys():
 		metric['tags'][k] = tags[k]
+	for k in fields.keys():
+		metric['fields'][k] = fields[k]
 
 	metric['timestamp'] = time.time()*1000
 
@@ -107,7 +111,7 @@ def ingestNetworkResources(adaptor, tags, networkBytes, iface):
 	md['value'] = networkBytes[1]
 	adaptor.metricFunc(md)
 
-def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector, networkInterface):
+def run(tags, fields, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector, networkInterface):
 	ingestFrequency = 1.
 	delta = 0.1
 	appName = "ndnrtc-client"
@@ -125,8 +129,8 @@ def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector, net
 				nfdResources = getProcessResources(nfdName)
 			if networkInterface:
 				networkBytes = getInterfaceBytes(networkInterface)
-				ingestNetworkResources(ingestAdaptor, tags, networkBytes, networkInterface)
-			ingestResources(ingestAdaptor, tags, {appName:ndnconResources, nfdName:nfdResources})
+				ingestNetworkResources(ingestAdaptor, tags, fields, networkBytes, networkInterface)
+			ingestResources(ingestAdaptor, tags, fields, {appName:ndnconResources, nfdName:nfdResources})
 		if statCollector:
 			statCollector.run()
 		time.sleep(delta)
@@ -135,10 +139,11 @@ def run(tags, isTrackingNdncon, isTrackingNfd, ingestAdaptor, statCollector, net
 #******************************************************************************
 # statistics gathering
 class StatCollector(object):
-	def __init__(self, keywords, ingestAdaptor, statFileFolder, tags):
+	def __init__(self, keywords, ingestAdaptor, statFileFolder, tags, fields):
 		self.keywords_ = keywords
 		self.adaptor_ = ingestAdaptor
 		self.tags_ = tags
+		self.fields_ = fields
 		self.path_ = statFileFolder
 		self.fileWatcher_ = TextFileWatcher(self.path_, self.newLine, extensions = ['stat'])
 
@@ -198,6 +203,8 @@ class StatCollector(object):
 			'stat-group': jsonData['stream']['stat_group']}
 		for k in self.tags_.keys():
 			metric['tags'][k] = self.tags_[k]
+		for k in self.fields_.keys():
+			metric['fields'][k] = self.fields_[k]
 		metric['timestamp'] = jsonData['stats']['timestamp']
 		# we name metric from stat group name
 		# its' value will be the first value in json
@@ -721,7 +728,7 @@ def main():
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "", ["username=", "hub=", \
 			"no-ndncon", "no-nfd", "dry-run", "iuser=", "ipassword=", "idb=", \
-			"influx-adaptor", "port=", "host=", "metrics=", "stat-folder=", "tags=", "iface="])
+			"influx-adaptor", "port=", "host=", "metrics=", "stat-folder=", "tags=", "iface=", "fields="])
 	except getopt.GetoptError as err:
 		print str(err)
 		usage()
@@ -747,6 +754,7 @@ def main():
 	keywords = []
 	statFolder = "/tmp"
 	userTags = {}
+	userFields = {}
 	iface = None
 	for o, a in opts:
 		if o in ("--username"):
@@ -785,6 +793,14 @@ def main():
 					key = kv[0]
 					value = kv[1]
 					userTags[key] = value
+		elif o in ("--fields"):
+			fieldPairs = a.split(",")
+			for pair in fieldPairs:
+				kv = pair.split("=")
+				if len(kv) == 2:
+					key = kv[0]
+					value = kv[1]
+					userFields[key] = value
 		elif o in ("--iface"):
 			iface = a
 		else:
@@ -811,10 +827,10 @@ def main():
 	statCollector = None
 	if len(keywords) > 0:
 		print "tracking metrics: "+str(keywords)
-		statCollector = StatCollector(keywords, ingestAdaptor, statFolder, userTags)
+		statCollector = StatCollector(keywords, ingestAdaptor, statFolder, userTags, userFields)
 
 	if trackNdncon or trackNfd or statCollector:
-		run(userTags, trackNdncon, trackNfd, ingestAdaptor, statCollector, iface)
+		run(userTags, userFields, trackNdncon, trackNfd, ingestAdaptor, statCollector, iface)
 
 if __name__ == '__main__':
 	main()

@@ -25,6 +25,7 @@ DefaultTimeFunc = lambda match: int(match.group('timestamp'))
 # - psegnum - total number of parity segments (optional, valid for data names only)
 # NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
 NdnRtcNameRegexString = "(/[A-z0-9_\-\+]+)+/(?P<user>[A-z0-9_\-\+]+)+/streams/(?P<stream>[A-z0-9_\-\+]+)+/(?P<thread>[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
+#NdnRtcNameRegexString = "(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<direction>Outgoing|Incoming)(Data|Interest)\sface=(?P<face>[0-9]+)\s(?P<traceType>data|interest)=(/[%A-z0-9_\-\+\.]+)+/ndnrtc/%FD%[0-9a-fA-F]+/(?P<stream_type>video|audio)/(?P<stream>\w+)/(?P<thread>\w+)/(?P<frame_type>d|k)/%FE(?P<frame_no>[%0-9a-fA-F]+)/(?P<seg_no>[%0-9a-fA-F]+)"
 
 # statistics captions
 NdnRtcStatCaptions = [
@@ -161,7 +162,7 @@ def segNoToInt(segNo):
   """ Converts canonical segment number (string) into an integer
   """
   try:
-  	return int(segNo.split("%")[1]+segNo.split("%")[2], 16)
+  	return int(''.join(segNo.split("%")[1:]), 16)
   except:
   	print "problem segno"+str(segNo)
   	return 0

@@ -10,6 +10,10 @@ def getTimestamp(line):
 		comps = re.split("[\t ]+", line)
 		if len(comps) > 0:
 			ts = float(comps[0])
+			# check number of digits - if it's 10 then timestamp is in seconds
+			# and adjustment is needed
+			if len(str(int(ts))) == 10:
+				ts = ts*1000
 	except:
 		return None
 	return ts

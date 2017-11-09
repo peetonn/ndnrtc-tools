@@ -10,9 +10,12 @@ from decimal import *
 from enum import Enum
 import ndnlog
 import re
+from pyndn import Name
 
 getcontext().prec = 6
-tracePatternString="(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<direction>Outgoing|Incoming)(Data|Interest)\sface=(?P<face>[0-9]+)\s(?P<traceType>data|interest)=(/[A-z0-9_\-\+]+)+/(?P<frame_type>delta|key)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
+# tracePatternString="(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<direction>Outgoing|Incoming)(Data|Interest)\sface=(?P<face>[0-9]+)\s(?P<traceType>data|interest)=(/[A-z0-9_\-\+]+)+/(?P<frame_type>d|k)/(?P<frame_no>[0-9]+)/(?P<data_type>data|parity)/(?P<seg_no>[%0-9a-fA-F]+)(/[0-9]+/(?P<play_no>[0-9]+)/(?P<segnum>[0-9]+)/(?P<psegnum>[0-9]+))?"
+#tracePatternString="(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<direction>Outgoing|Incoming)(Data|Interest)\sface=(?P<face>[0-9]+)\s(?P<traceType>data|interest)=(/[%A-z0-9_\-\+\.]+)+/ndnrtc/%FD%[0-9a-fA-F]+/(?P<stream_type>video|audio)/(?P<stream>\w+)/(?P<thread>\w+)/(?P<frame_type>d|k)/(?P<frame_no>%FE[\w%\+-]+)(/(?P<parity>_parity))?/(?P<seg_no>[%0-9a-fA-F]+)"
+tracePatternString="(?P<timestamp>[0-9]+\.[0-9]+)\sDEBUG:\s\[Forwarder\]\son(?P<direction>Outgoing|Incoming)(Data|Interest)\sface=(?P<face>[0-9]+)\s(?P<traceType>data|interest)=(/[%A-z0-9_\-\+\.]+)+/ndnrtc/%FD%[0-9a-fA-F]+/(?P<stream_type>video|audio)/(?P<stream>\w+)/(?P<thread>\w+)/(?P<frame_type>d|k)/(?P<frame_no>%FE[\w%\+-]+)/(?P<seg_no>[%0-9a-fA-F]+)"
 
 if len(sys.argv) < 2:
   print "usage: "+__file__+" <nfd1.log> [<nfd2.log> ...]"
@@ -33,8 +36,12 @@ if len(sys.argv) < 2:
 def getThreadName():
     return threading.current_thread().name
 
+def sequenceNoToInt(seqNoComp):
+	n = Name(seqNoComp)
+	return int(n[0].toSequenceNumber())
+
 def segNoToInt(segNo):
-  return int(segNo.split("%")[1]+segNo.split("%")[2], 16)
+  return int(''.join(segNo.split("%")[1:]), 16)
 
 class TraceType(Enum):
 	data = 1
@@ -52,8 +59,8 @@ class TraceType(Enum):
 
 class HubTraceEntry:
 	""" Hub trace represents interest or data being forwarded through the hub
-	Trace has two main attributes: i
-		- nTimestamp - a timestamp, when interest/data has entered forwarder
+	Trace has two main attributes:
+		- inTimestamp - a timestamp, when interest/data has entered forwarder
 		- outTimestamp - a timestamp when interest/data has left forwarder
 	"""
 	def __init__(self, *args, **kwargs):
@@ -238,8 +245,8 @@ def onTraceDetected(timestamp, match, userData):
 	global hubTraces
 	global operatingTracesDictList
 
-	hubNo = userData
-	frameNo = int(match.group('frame_no'))
+	hubNo = userData['userData']
+	frameNo = sequenceNoToInt(match.group('frame_no'))
 	segNo = segNoToInt(match.group('seg_no'))
 	traceType = TraceType.FromString(match.group('traceType'))
 	traceKey = str(frameNo)+'-'+match.group('frame_type')+'-'+str(segNo)+'-'+str(traceType)
@@ -515,12 +522,26 @@ def renderTimestamps(tsArray, sub):
 		raise Exception('unequal arrays lengths', tsArray, sub)
 	s = ''
 	i = 0
+	rtt = None
+	if tsArray[-1]:
+		rtt = tsArray[-1]-tsArray[1]
+	mid = (len(tsArray)-1)/2 # 1st element is a key number
+	genDelay = None
+	if tsArray[mid+1] and tsArray[mid]:
+		genDelay = int((tsArray[mid+1] - tsArray[mid])*1000)
 	for el in tsArray:
 		s += str(el) if el else '-'
 		if sub and sub[i]:
 			s += ' ^'+str(int(sub[i]*1000))+'ms'
 		i += 1
+		if i == mid+1:
+			if genDelay:
+				s += '\t|<-'+str(genDelay)+'ms->|'
+			else:
+				s += '\t|<-???->|'
 		s += '\t'
+	if rtt:
+		s += 'rtt ' + str(int(rtt*1000)) + 'ms'
 	return s
 
 prevTimestamps = [None for i in range(0, len(timestampsTable[0]))]
