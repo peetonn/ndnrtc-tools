@@ -20,7 +20,8 @@ def normalizeTimestamp(line):
 			if not firstTimestamp:
 				firstTimestamp = ts
 			ts -= firstTimestamp
-			line = line.replace(comps[0], str(ts))
+			if ts >= 0:
+				line = line.replace(comps[0], str(ts), 1)
 	except:
 		return line
 	return line
