@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import re
 from pyndn import Name
 
 if len(sys.argv) < 2:
@@ -11,13 +12,19 @@ if len(sys.argv) < 2:
 if __name__ == '__main__':
 	logFile = sys.argv[1]
 	lastBufferAppend = {}
+	p = re.compile('(%FE[\w%\+\-\.]+)')
 
 	def processLine(line):
-		comps = [comp for comp in line.split("/") if comp.startswith('%FE')]
+		# comps = [comp for comp in line.split("/") if comp.startswith('%FE')]
+		comps = re.findall(p, line)
+		# print line
 		if len(comps):
+			# print comps
 			for c in comps:
-				num = Name(c)[-1].toSequenceNumber()
-				line = line.replace(c, str(num))
+				seq = c
+				# print(seq)
+				num = Name(seq)[-1].toSequenceNumber()
+				line = line.replace(seq, str(num))
 		sys.stdout.write(line)
 
 	if logFile == '-':

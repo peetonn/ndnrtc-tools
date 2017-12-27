@@ -41,7 +41,7 @@ if __name__ == '__main__':
 			assert False, "unhandled option "+o
 
 	if len(args) < 1:
-		print "provide timestamp"
+		print "provide frame number"
 		exit(2)
 	
 	baseFrame = int(args[0])

@@ -1,11 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 
-PRODUCER_NAME="clockwork_ndn"
-PRODUCER_PREFIX="/ndn/edu/ucla/remap"
+DEBUG=1
 
-NDNCON_APP_DIR="/Users/peetonn/Library/Developer/Xcode/DerivedData/NDN-RTC-avqsddpibbpodvhlerpstaxbmfzi/Build/Products/Debug/ndncon.app"
-NDNCON_APP="${NDNCON_APP_DIR}/Contents/MacOS/ndncon"
-NDNCON_APP_ARGS="-auto-fetch-prefix ${PRODUCER_PREFIX} -auto-fetch-user ${PRODUCER_NAME} -auto-fetch-audio 1"
+RUNTIME=$1
+USER_NOTE=$2
+
+REMOTE_SERVER="node"
+USER="peter"
+OUT_FOLDER=.
 
 NDN_DAEMON=nfd
 NDN_DAEMON_START="nfd-start"
@@ -13,21 +15,16 @@ NDN_DAEMON_STOP=nfd-stop
 NDN_DAEMON_LOG="nfd.log"
 NDN_DAEMON_REG_PREFIX="nfdc register"
 
-NDNPING_CMD="ndnping"
-PING_CMD="ping"
+PRODUCER_PREFIX="/icear"
+PRODUCER_IP=131.179.142.116
+# PRODUCER_IP=131.179.142.128
 
-SCREENCAP_INTERVAL=20
-SCREENCAP="screencapture -l$(osascript -e 'tell app "Safari" to id of window 1')"
-
-HOSTS_SCRIPT="gethubs.py"
-HOSTS_WEBPAGE="http://www.arl.wustl.edu/~jdd/ndnstatus/ndn_prefix/tbs_ndnx.html"
-GET_HOSTS_CMD="python $HOSTS_SCRIPT $HOSTS_WEBPAGE"
-
-HUBS=()
-HUB_NAMES=()
-
-TESTS_FOLDER="out/$(date +%Y-%m-%d_%H-%M)"
-DEBUG=1
+NDNRTC_LOCATION="/home/peter/ice-ar/edge/ndnrtc/cpp/peter-build"
+NDNRTC_CLIENT="$NDNRTC_LOCATION/ndnrtc-client"
+NDNRTC_CONFIG="$NDNRTC_LOCATION/icear-consumer.cfg"
+NDNRTC_RULEFILE="$NDNRTC_LOCATION/rule.conf"
+NDNRTC_IDENTITY="/"
+NDNRTC_RUNTIME=$RUNTIME
 
 function log()
 {
@@ -41,55 +38,11 @@ function error()
 	echo "! ${1}"
 }
 
-function usage()
+function runCmd()
 {
-	echo "${0} -t <test_time_sec> [-h <hubs_file>]"
-	echo "	Test scenario - one-to-one unidirectional stream fetching accross the testbed"
-	echo "	It is assumed that there's a producer avaiable somewhere on the testbed under "
-	echo "	PRODUCER_PREFIX prefix and PRODUCER_NAME username"
-	echo "	This script executes consumer-only tests per hub provided. If hubs file is provided"
-	echo "	script will execute one test per hub. Otherwise, it will get all currently available hubs"
-	echo "	on NDN testbed and run test per each hub then. A hubs file is a tab-delimited two-column file"
-	echo "	first column contains hub name and second it's servername or IP address"
-	echo "	Each test will run for <test_time_sec> seconds per testbed hub and will include following steps:"
-	echo "		- ensure NFD and ndncon are stopped"
-	echo "		- start NFD, register prefix / to the current testbed hub"
-	echo "		- start ndnping utility"
-	echo "		- start ping utility"
-	echo "		- start ndncon with auto-fetching arguments to fetch from test producer (test producer is defined"
-	echo "			by variables PRODUCER_PREFIX and PRODUCER_NAME"
-	echo "		- every 20 seconds a screenshot of opened Safari window will be taken (it's supposed to have NDN"
-	echo "			testbed map opened in Safari)"
-	echo "		- stop ndncon after test time elapsed"
-	echo "		- stop NFD, stop ndnping and ping utilities"
-	echo "		- copy nfd.log, ndnping.log, ping.log and consumer log file to the subfolder named as currently tested"
-	echo "			hub under test run folder in 'out' directory. Test run folder is named with current date and time."
-}
-
-function getPid()
-{
-	local pid
-	pid=$(ps -Ao pid,comm | grep "$1" | cut -d' ' -f1)
-	echo $pid
-}
-
-function stopApp()
-{
-	killall $1 >/dev/null 2>&1
-}
-
-function getHubs()
-{
-	while read line; do pair=($line); HUB_NAMES+=(${pair[0]}); HUBS+=(${pair[1]}); done < "${1}"
-}
-
-function setupEnv()
-{
-	local hub=$1
-	local address=$2
-
-	log "setting up environment for $hub..."
-	mkdir -p "$TESTS_FOLDER/$hub"
+	cmd=$1
+	log $cmd
+	eval "ssh -t $USER@$REMOTE_SERVER $cmd"
 }
 
 function nfdRegisterPrefix()
@@ -98,176 +51,78 @@ function nfdRegisterPrefix()
 	local ip=$2
 
 	log "registering prefix / for $ip..."
-	eval "${NDN_DAEMON_REG_PREFIX} / udp://$ip"
+	runCmd "$NDN_DAEMON_REG_PREFIX $prefix udp://$ip"
 }
 
 function setupNfd()
 {
-	local hub=$1
+	local prefix=$1
 	local address=$2
 
-	log "setting up NFD for $hub..."
-	$NDN_DAEMON_START &> "$TESTS_FOLDER/$hub/nfd.log"
+	log "setting up NFD..."
+	runCmd "$NDN_DAEMON_START"
 	
 	if [ $? -eq 0 ]; then
-		sleep 5
-		nfdRegisterPrefix $PRODUCER_PREFIX $address
+		sleep 2
+		nfdRegisterPrefix $prefix $address
 	fi
+
+	ssh -f $USER@$REMOTE_SERVER "journalctl -u nfd > /tmp/nfd.log"
 }
 
-function setupNdnping()
+function setupTcpDump()
 {
-	local hub=$1
-	local address=$2
-
-	log "setting up ndnping for $hub..."
-	$NDNPING_CMD $PRODUCER_PREFIX > "$TESTS_FOLDER/$hub/ndnping.log" 2>&1 &
+	ssh -f $USER@$REMOTE_SERVER "sudo tcpdump -i eno1 'ether proto 0x8624 || udp port 6363' -w /tmp/tcpdump.pcap"
+	ssh -f $USER@$REMOTE_SERVER "sudo ndndump -i eno1  > /tmp/ndndump.log"
 }
 
-function setupPing()
+function cleanupTcpDump()
 {
-	local hub=$1
-	local address=$2
-
-	log "setting up ping for $hub..."
-	$PING_CMD $address > "$TESTS_FOLDER/$hub/ping.log" 2>&1 &
-}
-
-function setupNdncon()
-{
-	local hub=$1
-	local address=$2
-
-	log "setting up ndncon for $hub..."
-	$NDNCON_APP $NDNCON_APP_ARGS > "$TESTS_FOLDER/$hub/ndncon.log" 2>&1 &
-}
-
-function copyNdnconLog()
-{
-	local hub=$1
-	cp /tmp/consumer-${PRODUCER_NAME}-*.log $TESTS_FOLDER/$hub/
-}
-
-function takeScreenshot()
-{
-	local hub=$1
-	$SCREENCAP $TESTS_FOLDER/$hub/$SCREENSHOT_IDX.png
-}
-
-function cleanupNdncon()
-{
-	stopApp "ndncon"
-}
-
-function cleanupPing()
-{
-	stopApp $PING_CMD
-}
-
-function cleanupNdnping()
-{
-	stopApp $NDNPING_CMD
+	runCmd "sudo killall tcpdump"
+	runCmd "sudo killall ndndump"
 }
 
 function cleanupNfd()
 {
-	eval "${NDN_DAEMON_STOP}"
+	runCmd "rm /tmp/nfd*.log"
+	runCmd "rm /tmp/consumer*.log"
+	runCmd "${NDN_DAEMON_STOP}"
+	runCmd "killall journalctl"
 }
 
-hubsFile="N/A"
-testTime=""
+function runClient()
+{
+	runCmd "$NDNRTC_CLIENT -c $NDNRTC_CONFIG -s $NDNRTC_IDENTITY -p $NDNRTC_RULEFILE -t $NDNRTC_RUNTIME -v"
+}
 
-while getopts ":h:t:" opt; do
-  case $opt in
-    h) hubsFile="$OPTARG"
-    ;;
-    t) testTime="$OPTARG"
-    ;;
-    \?) log "Invalid option -$OPTARG" >&2
-    ;;
-  esac
-done
-
-if [ "${testTime}" = "" ]
-then 
-	usage
-	exit 1
-fi
-
-if [ "${hubsFile}" = "N/A" ]
-then
-	log "retrieveing actual list of hubs..."
-	tmpfile=$(mktemp -t ndnhubs)
-	eval $GET_HOSTS_CMD > $tmpfile
-	getHubs $tmpfile
-else
-	log "reading hubs from a file..."
-	getHubs $hubsFile
-fi
-
-# start test run
-log "test files will be placed in $TESTS_FOLDER"
-mkdir -p "$TESTS_FOLDER"
-
-# make sure everything is down
+# restart and setup NFD, and gather NFD logs
 cleanupNfd
-cleanupNdnping
-cleanupPing
-cleanupNdncon
-sleep 2
+setupNfd $PRODUCER_PREFIX $PRODUCER_IP
+setupTcpDump
 
-idx=0
-for hub in ${HUB_NAMES[@]} ; do
-	address=${HUBS[$idx]}
-	log "running test $idx for hub $hub (address $address)"
-	
-	setupEnv $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up environment for $hub. skipping to the next hub..."
-        continue
-    fi
+# start tcpdump gathering
 
-	setupNfd $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up NFD for $hub. skipping to the next hub..."
-        continue
-    fi
+# start client
+runClient
 
-    setupNdnping $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up ndnping for $hub. skipping to the next hub..."
-        continue
-    fi
+# stop tcpdump
+cleanupTcpDump
 
-    setupPing $hub $address
-	if [ $? -ne 0 ]; then
-        error "error setting up ping for $hub. skipping to the next hub..."
-        continue
-    fi
+# creating subfolder for log files
+TESTS_FOLDER="${OUT_FOLDER}/test-$(date +%Y-%m-%d_%H-%M)_$USER_NOTE"
+mkdir -p $TESTS_FOLDER
 
-    setupNdncon $hub $address
-    if [ $? -ne 0 ]; then
-        error "error setting up ndncon for $hub. skipping to the next hub..."
-        continue
-    fi
+# getting ndnrtc-client logs
+scp $USER@$REMOTE_SERVER:/tmp/consumer-*.log $TESTS_FOLDER/
+scp $USER@$REMOTE_SERVER:/tmp/nfd*.log $TESTS_FOLDER/
+mkdir -p $TESTS_FOLDER/stats
+scp $USER@$REMOTE_SERVER:/tmp/*.stat $TESTS_FOLDER/stats
+scp $USER@$REMOTE_SERVER:/tmp/tcpdump.pcap $TESTS_FOLDER/
+scp $USER@$REMOTE_SERVER:/tmp/ndndump.log $TESTS_FOLDER/
 
-    log "running test $idx..."
-    SCREENSHOT_IDX=0
-    runTime=0
-    while [ $runTime -le $testTime ] ; do
-    	sleep $SCREENCAP_INTERVAL
-    	takeScreenshot $hub $address
-    	let runTime+=$SCREENCAP_INTERVAL
-    	let SCREENSHOT_IDX+=1
-    done
-
-    copyNdnconLog $hub $address
-    cleanupNdncon $hub $address
-    cleanupPing $hub $address
-    cleanupNdnping $hub $address
-    cleanupNfd $hub $address
-	let idx+=1
-
-	log "test $idx completed"
-	sleep 5
-done
+# prepping logs
+cd $TESTS_FOLDER
+cat consumer-*.log | normalize-time.py | toseqno.py - > all.log
+cat ndndump.log | normalize-time.py | toseqno.py - > ndndump-norm.log
+prep-logs.sh
+cd ..
