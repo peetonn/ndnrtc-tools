@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 LOG_ALL="all.log"
 LOG_ALL_NO_BUFFER_JUNK="0_log_all_buff_clean.log.tmp"
