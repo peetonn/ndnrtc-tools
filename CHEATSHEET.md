@@ -49,4 +49,3 @@
     cat all.log | chunk.py -i 100 5min
     ```
 
-6. Extract timstamps of 
