@@ -64,6 +64,43 @@ Extract +/-100ms of log entries around 5th minute in the log file:
 
     cat all.log | chunk.py -i 100 5min
 
+### frames assembling and playout
+CSV format: 
+    timestamp, interest-seg0-delta, interest-seg0-key, frame-assembled-delta, frame-assembled-key, frame-playout-delta, frame-playout-key
+    
+    cat 0_log_debug.log | gawk 'match($0, /(requested.*\/(d|k)\/([0-9]+) .*)|(assembled frame.*\/(d|k)\/([0-9]+).*)|(play frame.*\/(d|k)\/([0-9]+).*)/, a) \
+                                { OFS=","; \
+                                  if (a[2] == "d") \
+                                    print $1, a[3], "", "", "", "", ""; \
+                                  else { \
+                                    if (a[2] == "k") \
+                                      print $1, "", a[3], "" , "" , "" , "", ""; \
+                                    else { \
+                                      if (a[5] == "d") \
+                                        print $1, "", "", a[6], "", "", ""; \
+                                      else { \
+                                        if (a[5] == "k") \
+                                          print $1, "", "", "", a[6], "", ""; \
+                                        else { \
+                                          if (a[8] == "d") \
+                                            print $1, "", "", "", "", a[9], ""; \
+                                          else { \
+                                            if (a[8] == "k") \
+                                              print $1, "", "", "", "", "", a[9]; \
+                                          }}}}}}' > frames.csv
+    gnuplot -p -e 'set datafile sep ","; 
+                   set key outside; 
+                   set xlabel "Time"; 
+                   set ylabel "Delta frames"; 
+                   set y2label "Key frames"; 
+                   set ytics nomirror; 
+                   set y2tics; 
+                   plot "frames.csv" using 1:2 title "delta-I", 
+                        "" using 1:3 title "key-I" axes x1y2, 
+                        "" using 1:4 title "delta-Assembled", 
+                        "" using 1:5 title "key-Assembled" axes x1y2, 
+                        "" using 1:6 title "delta-play",
+                        "" using 1:7 title "key-play" axes x1y2,'
 
 
 
